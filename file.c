@@ -54,34 +54,74 @@ ssize_t onefilefs_read(struct file * filp, char __user * buf, size_t len, loff_t
 }
 
 ssize_t myfileops_read(struct file * filp, char __user * buf, size_t len, loff_t * off){  
-    myfiledata_struct *p=(myfiledata_struct* ) filp->private_data;
-    int ret = 0;
-    for(int i=0;i<NBLOCK;i++){
-        if(data[i].block_information.valid){
-            if(data[i].block_information.num > p->num){ 
-                if(data[i].block_information.dimension+ret<len){
-                    int ret1=copy_to_user(buf+ret,data[i].data,data[i].block_information.dimension);
-                    if(ret1!=0){
-                        p->num= data[i].block_information.num
-                        return ret + data[i].block_information.dimension - ret1;
+    int i=0;
+    int ret=0;
+    myfiledata_struct* s = (myfiledata_struct*)filp->private_data;
+    int time = s->num;
+    int maxTime =  time;
+    char * string_to_pass = kmalloc(len,0);//GFP_KERNEL
+    //printk("time=%d %d\n",time, s->num);
+    struct super_block * sb = filp->f_inode->i_sb;
+    if(metadata_vector == NULL) printk("errore\n");
+    //printk("soono qui per provare a vedere qualcosa\n");
+    //stampa_mvector();
+    for(;i<NBLOCK;i++){
+        if(ret<len){
+            __sync_fetch_and_add(&(metadata_vector[i].countLettore),1);
+            if(metadata_vector[i].valid==1){
+                printk("e qui?%d\n",metadata_vector[i].time);
+                if(metadata_vector[i].time > time){
+                    printk("e qui?%d\n",metadata_vector[i].dimension);
+                    if(ret+metadata_vector[i].dimension<=len){
+                        struct buffer_head *bh = sb_bread(sb,metadata_vector[i].index_block);
+                        printk("string to create %s",((block_file_struct*)bh->b_data)->dati);
+                        strncpy(string_to_pass+ret,((block_file_struct*)bh->b_data)->dati,metadata_vector[i].dimension);
+                        //int ret1 = copy_to_user(buf,((block_file_struct*) bh->b_data)->dati,metadata_vector[i].dimension);
+                        printk("string to pass: %s\n",string_to_pass); 
+                        ret = ret + metadata_vector[i].dimension;
+                        if(metadata_vector[i].time> maxTime) maxTime=metadata_vector[i].time; // credo devo vedere se si può effettuare con qualche istruzione atomica.
+                        brelse(bh);
                     }
-                    else
-                } else { 
-                    p->num=100;
-                    return ret;
+                    else{
+                        __sync_fetch_and_sub(&(metadata_vector[i].countLettore),1);
+                        ((myfiledata_struct*)filp->private_data)->num=maxTime;
+                        strncpy(string_to_pass+ret,"\0",1);
+                        ret=ret+1;
+                        printk("1 ret=%d string to pass%s\n",ret ,string_to_pass);
+                        int ret1=copy_to_user(buf,string_to_pass,ret);
+                        return ret-ret1;
+                    }
                 }
             }
+            __sync_fetch_and_sub(&(metadata_vector[i].countLettore),1);
+        }else{ 
+            ((myfiledata_struct*)filp->private_data)->num=maxTime;
+            strncpy(string_to_pass+ret,"\0",1);
+            ret=ret+1;
+            printk("2 ret=%d string to pass%s\n",ret ,string_to_pass);
+            int ret1=copy_to_user(buf,string_to_pass,ret);
+            return ret-ret1;
         }
     }
-    p->num=100;
+    if(ret!=0){
+        ((myfiledata_struct*)filp->private_data)->num=maxTime;
+        strncpy(string_to_pass+ret,"\0",1);
+        ret=ret+1;
+        int ret1=copy_to_user(buf,string_to_pass,ret);
+        printk("3 ret=%d string to pass%s\n",ret ,string_to_pass);
+        return ret-ret1;
+    }
+        ((myfiledata_struct*)filp->private_data)->num=maxTime;
     return ret;
 }
 
 int myfileops_open(struct inode * inode, struct file * file){
-    myfiledata_struct * fdata=(myfiledata_struct*) kmalloc(sizeof(myfiledata_struct),0);
+    myfiledata_struct * fdata=(myfiledata_struct*) kzalloc(sizeof(myfiledata_struct),0);
+    if(fdata == NULL) printk("Error\n");
     fdata->num=0;
     int error = stream_open(inode,file);
-    file->private_data=fdata;
+    file->private_data=(void*) fdata;
+    printk("fdata->num: %d\n",fdata->num);
     return error; 
 }
 int myfileops_release(struct inode * inode, struct file * file){

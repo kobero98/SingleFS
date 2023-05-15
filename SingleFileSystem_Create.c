@@ -18,7 +18,7 @@ int main(int argc,char *argv[]){
     struct_sb_information sb;
     struct_MyInode root_inode;
     struct_MyInode file_inode;
-    char * file_body= "volsi cosi cola come si pote dove si vuole";
+    char * file_body= "volsi cosi cola come si pote dove si vuole\n";
 
     if(argc != 2){
         return -1;
@@ -28,18 +28,16 @@ int main(int argc,char *argv[]){
 
     sb.magic = MAGICNUMBER;
     sb.version = 0.1;
-    sb.nblock = 3;
+    sb.nblock = 10;
 
     ret = write(fd,(char * )&sb, sizeof(sb));
     if(ret != 4096) {
-        printf("%d \n",ret);
-        printf("ciao1\n");
         close(fd);
         return -ret;
     }
     file_inode.mode = S_IFREG;
     file_inode.inode_number = 1;
-    file_inode.file_size = strlen(file_body);
+    file_inode.file_size = strlen(file_body)+1;
     fflush(stdout);
     ret = write(fd, (char*)&file_inode,sizeof(file_inode));
     if (ret != sizeof(file_inode)){
@@ -53,14 +51,38 @@ int main(int argc,char *argv[]){
         close(fd);
         return -1;
     }
-    nbytes = strlen(file_body);
-    ret = write(fd,file_body,nbytes);
-    if (ret != nbytes){
-        close(fd);
-        return -1;
-    }
+    block_file_struct p;
+    p.block_information.time = 1;
+    p.block_information.valid = 0x1;
+    p.block_information.dimension = strlen(file_body)+1;
+    strncpy(p.dati,file_body,strlen(file_body));
+    ret = write(fd,(char*)&p,sizeof(p));
+    printf("quanto ha scritto:%d %d\n",ret,sizeof(p));
+    printf("%d %d\n",strlen(file_body),p.block_information.valid);
+    
+    p.block_information.time = 2;
+    p.block_information.valid = 0x1;
+    p.block_information.dimension = strlen(file_body)+1;
+    strncpy(p.dati,file_body,strlen(file_body));
+    ret = write(fd,(char*)&p,sizeof(p));
+    printf("quanto ha scritto:%d %d\n",ret,sizeof(p));
+    printf("%d %d\n",strlen(file_body),p.block_information.valid); 
+
+    p.block_information.time = 3;
+    p.block_information.valid = 0x0;
+    p.block_information.dimension = strlen(file_body)+1;
+    strncpy(p.dati,file_body,strlen(file_body));
+    ret = write(fd,(char*)&p,sizeof(p));
+    printf("quanto ha scritto:%d %d\n",ret,sizeof(p));
+    printf("%d %d\n",strlen(file_body),p.block_information.valid);      
+   
+    p.block_information.time = 4;
+    p.block_information.valid = 0x1;
+    p.block_information.dimension = strlen(file_body)+1;
+    strncpy(p.dati,file_body,strlen(file_body));
+    ret = write(fd,(char*)&p,sizeof(p));
+    printf("quanto ha scritto:%d %d\n",ret,sizeof(p));
+    printf("%d %d\n",strlen(file_body),p.block_information.valid);
     printf("tutto avvenuto con successo\n");
-    
-    
     return 0;
 }

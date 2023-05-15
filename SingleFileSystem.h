@@ -17,13 +17,20 @@
 #define SINGLEFILEFS_ROOT_INODE_NUMBER 10
 #define SINGLEFILEFS_INODES_BLOCK_NUMBER 1
 //struttura dei metadati di ogni blocco del fs
-
-typedef struct metadati_block_struct{
-    int num;
-    int valid:1;
+typedef struct metadati_block_ram{
+    int time;
+    unsigned int valid:1;
     size_t dimension;
     int index_block;
-    struct metadati_block_struct * next;
+    int countLettore;
+    int countScrittore;
+}metadati_block_ram;
+
+typedef struct metadati_block_struct{
+    int time;
+    unsigned int valid:1;
+    size_t dimension;
+    //int index_block; me sa non serve
 }metadati_block_struct;
 
 typedef struct myfiledata_struct{
@@ -43,8 +50,9 @@ typedef struct struct_sb_information{
     uint64_t magic;
     uint64_t version;
     uint64_t nblock;
+    uint64_t nblock_in_use;
     //padding da lasciare al superblock.
-    char padding[(4*1024)-(3*sizeof(uint64_t))];
+    char padding[(4*1024)-(4*sizeof(uint64_t))];
 }struct_sb_information;
 
 //definizione myInode
@@ -58,10 +66,12 @@ typedef struct struct_MyInode{
     };
 }struct_MyInode;
 
-static block_file_struct data[NBLOCK];
 
+//static metadati_block_struct data[NBLOCK];
+extern metadati_block_ram metadata_vector[NBLOCK];
 //file.c
 extern const struct inode_operations onefilefs_inode_ops;
 extern const struct file_operations onefilefs_file_operations;
 // dir.c
 extern const struct file_operations onefilefs_dir_operations;
+extern void stampa_mvector(void);

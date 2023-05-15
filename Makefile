@@ -2,12 +2,12 @@ obj-m := SingleFileSystem.o
 SingleFileSystem-objs += file.o dir.o SingleFS.o
 #SingleFileSystem-y := file.o dir.o
 KDIR := /lib/modules/$(shell uname -r)/build
-EXTRA_CFLAGS:= -D NBLOCK=3
+EXTRA_CFLAGS:= -D NBLOCK=10
 all:
 	gcc SingleFileSystem_Create.c 
 	make -C $(KDIR) M=$(PWD) modules
 clean:
-	#rm a.out
+	rm a.out
 	make -C $(KDIR) M=$(PWD) clean
 insmod:
 	insmod SingleFileSystem.ko
