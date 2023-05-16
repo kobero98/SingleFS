@@ -6,7 +6,6 @@
 
 int put_data(char * source,size_t size){
     printk("sono la systemcall put_data\n");
-    
     return 0;
 }
 int get_data(int offset,char * destination,size_t size){

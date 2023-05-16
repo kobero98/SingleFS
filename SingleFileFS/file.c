@@ -60,30 +60,27 @@ ssize_t myfileops_read(struct file * filp, char __user * buf, size_t len, loff_t
     int time = s->num;
     int maxTime =  time;
     char * string_to_pass = kmalloc(len,0);//GFP_KERNEL
-    //printk("time=%d %d\n",time, s->num);
     struct super_block * sb = filp->f_inode->i_sb;
-    if(metadata_vector == NULL) printk("errore\n");
-    //printk("soono qui per provare a vedere qualcosa\n");
-    //stampa_mvector();
+    if(testa_valid == NULL) printk("errore\n");
     for(;i<NBLOCK;i++){
         if(ret<len){
-            __sync_fetch_and_add(&(metadata_vector[i].countLettore),1);
-            if(metadata_vector[i].valid==1){
-                printk("e qui?%d\n",metadata_vector[i].time);
-                if(metadata_vector[i].time > time){
-                    printk("e qui?%d\n",metadata_vector[i].dimension);
-                    if(ret+metadata_vector[i].dimension<=len){
-                        struct buffer_head *bh = sb_bread(sb,metadata_vector[i].index_block);
+            __sync_fetch_and_add(&(testa_valid->countLettore),1);
+            if(testa_valid->valid==1){
+                printk("e qui?%d\n",testa_valid->time);
+                if(testa_valid->time > time){
+                    printk("e qui?%d\n",testa_valid->dimension);
+                    if(ret+testa_valid->dimension<=len){
+                        struct buffer_head *bh = sb_bread(sb,testa_valid->index_block);
                         printk("string to create %s",((block_file_struct*)bh->b_data)->dati);
-                        strncpy(string_to_pass+ret,((block_file_struct*)bh->b_data)->dati,metadata_vector[i].dimension);
+                        strncpy(string_to_pass+ret,((block_file_struct*)bh->b_data)->dati,testa_valid->dimension);
                         //int ret1 = copy_to_user(buf,((block_file_struct*) bh->b_data)->dati,metadata_vector[i].dimension);
                         printk("string to pass: %s\n",string_to_pass); 
-                        ret = ret + metadata_vector[i].dimension;
-                        if(metadata_vector[i].time> maxTime) maxTime=metadata_vector[i].time; // credo devo vedere se si può effettuare con qualche istruzione atomica.
+                        ret = ret + testa_valid->dimension;
+                        if(testa_valid->time> maxTime) maxTime=testa_valid->time; // credo devo vedere se si può effettuare con qualche istruzione atomica.
                         brelse(bh);
                     }
                     else{
-                        __sync_fetch_and_sub(&(metadata_vector[i].countLettore),1);
+                        __sync_fetch_and_sub(&(testa_valid->countLettore),1);
                         ((myfiledata_struct*)filp->private_data)->num=maxTime;
                         strncpy(string_to_pass+ret,"\0",1);
                         ret=ret+1;
@@ -93,7 +90,7 @@ ssize_t myfileops_read(struct file * filp, char __user * buf, size_t len, loff_t
                     }
                 }
             }
-            __sync_fetch_and_sub(&(metadata_vector[i].countLettore),1);
+            __sync_fetch_and_sub(&(testa_valid->countLettore),1);
         }else{ 
             ((myfiledata_struct*)filp->private_data)->num=maxTime;
             strncpy(string_to_pass+ret,"\0",1);

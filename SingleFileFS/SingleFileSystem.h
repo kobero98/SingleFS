@@ -24,6 +24,7 @@ typedef struct metadati_block_ram{
     int index_block;
     int countLettore;
     int countScrittore;
+    struct metadati_block_ram *next;
 }metadati_block_ram;
 
 typedef struct metadati_block_struct{
@@ -67,14 +68,16 @@ typedef struct struct_MyInode{
 }struct_MyInode;
 
 
-//static metadati_block_struct data[NBLOCK];
-extern metadati_block_ram metadata_vector[NBLOCK];
+
+extern metadati_block_ram *testa_valid;
+extern metadati_block_ram *testa_invalid;
 //file.c
 extern const struct inode_operations onefilefs_inode_ops;
 extern const struct file_operations onefilefs_file_operations;
 // dir.c
 extern const struct file_operations onefilefs_dir_operations;
-extern void stampa_mvector(void);
+extern void stampa_invalid(void);
+extern void stampa_valid(void);
 extern int put_data(char * source,size_t size);
 extern int get_data(int ,char * ,size_t );
 extern int invalidate_data(int );

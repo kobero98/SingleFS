@@ -27,6 +27,7 @@ metadati_block_ram * testa_valid;
 metadati_block_ram * testa_invalid;
 static int ticketToWrite = 0;
 static int countFSmount = 0;
+
 //driver da implementare!
 static struct super_operations myFileSystem_super_ops = {};
 static struct dentry_operations myFileSystem_dentry_ops={};
@@ -34,30 +35,51 @@ static struct inode_operations myFileSystem_inode_ops = {};
 static struct file_operations myFileSystem_file_ops = {};
 static struct file_operations myFileSystem_dir_ops = {};
 
-void inserimento_incoda(struct super_block *);
-void init_metadata(struct buffer_head *,int );
-void stampa_mvector(void);
+void inserimento_incoda(metadati_block_ram ** ,metadati_block_ram*, int s);
+void init_metadata(struct super_block * );
+void stampa_invalid(void);
+void stampa_valid(void);
 
 
-void stampa_mvector(){
-    metadata_block_ram *q;
+void stampa_valid(){
+    metadati_block_ram *q;
+    int i=0;
     for(q=testa_valid;q!=NULL;q=q->next){
         printk("%d] %d %d %d \n",i,q->time,q->valid,q->dimension);
+        i++;
     }
 }
-void inserimento_incoda(metadata_block_ram ** doveInserire,metadata_block_ram*chiInserire){
+void stampa_invalid(){
+    metadati_block_ram *q;
+    int i=0;
+    for(q=testa_invalid;q!=NULL;q=q->next){
+        printk("%d] %d %d %d \n",i,q->time,q->valid,q->dimension);
+        i++;
+    }
+}
+void inserimento_incoda(metadati_block_ram ** doveInserire,metadati_block_ram* chiInserire,int s){
     if(likely(*doveInserire != NULL)){
-        (*doveInserire)->next=chiInserire
-    }else{ *doveInserire=chiInserire;}
+        (*doveInserire)->next=chiInserire;
+    }else{ 
+        if(s==0){
+            *doveInserire = chiInserire;
+            testa_invalid = chiInserire;
+        }
+        else {
+            *doveInserire = chiInserire;
+            testa_valid = chiInserire;
+        }   
+    }
+
 }
 void init_metadata(struct super_block * sb){
     testa_valid=NULL;
     testa_invalid=NULL;
-    q1=testa_valid;
-    q2=testa_invalid;
-    for(j=2;j<NBLOCK+2;j++){ 
-        buffer_head *b = sb_bread(sb,j);
-        metadata_block_ram *p= (metadata_block_ram*) kzalloc(sizeof(metadati_block_ram),0);
+    metadati_block_ram* valid=testa_valid;
+    metadati_block_ram* invalid=testa_invalid;
+    for(int j=2;j<NBLOCK+2;j++){ 
+        struct buffer_head *b = sb_bread(sb,j);
+        metadati_block_ram *p= (metadati_block_ram*) kzalloc(sizeof(metadati_block_ram),0);
         if(p==NULL) return;
         metadati_block_struct data_read = ((block_file_struct*) b->b_data)->block_information;
         p->valid = data_read.valid;
@@ -67,9 +89,9 @@ void init_metadata(struct super_block * sb){
         p->countScrittore=0;
         p->next=NULL;
         if(p->valid){
-            inserimento_incoda(&q1,p);
+            inserimento_incoda(&valid,p,1);
         }else{
-            inserimento_incoda(&q2,p);
+            inserimento_incoda(&invalid,p,0);
         }
         brelse(b);
     }
@@ -120,8 +142,8 @@ int myFileSystem_fill_sb(struct super_block *sb,void*data,int silent){
     sb->s_root->d_op = &myFileSystem_dentry_ops;
     unlock_new_inode(root_inode);
     init_metadata(sb);
-    stampa_mvector();
-    printk("metadatapointer: %p",metadata_vector);
+    stampa_invalid();
+    stampa_valid();
     printk("mount avvenuta con successo\n");
     return 0;
 }
@@ -144,6 +166,22 @@ static void myFileSystem_kill_sb(struct super_block *sb){
         
         printk("non é possibile smontare il file system\n");
         return ;
+    }
+    //free list valid
+    metadati_block_ram * q = testa_valid;
+    metadati_block_ram * p = testa_valid;
+    while(q!=NULL){
+        p=p->next;
+        kfree(q);
+        q=p;
+    }
+    //free list invalid
+    q = testa_invalid;
+    p = testa_invalid;
+    while(q!=NULL){
+        p=p->next;
+        kfree(q);
+        q=p;
     }
     kill_block_super(sb);
     printk("file system smontato\n");

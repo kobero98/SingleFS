@@ -9,7 +9,7 @@ all:
 clean:
 	make -C $(KDIR) M=$(PWD) clean 
 insmod:
-	insmod SingleFileSystem.ko systemcall_table=systemcalltable free_entries=array_free_entries
+	insmod SingleFileSystem.ko systemcall_table=$(systemcalltable) free_entries=$(array_free_entries)
 insmod-extern:
 	insmod SingleFileFS/SingleFileSystem.ko systemcall_table=$(systemcalltable) free_entries=$(array_free_entries)
 rmmod-extern:
