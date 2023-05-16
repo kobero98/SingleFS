@@ -119,7 +119,6 @@ int myFileSystem_fill_sb(struct super_block *sb,void*data,int silent){
     printk("mount avvenuta con successo\n");
     return 0;
 }
-
 //funzione per il montaggio del filesystem
 struct dentry * myFileSystem_mount(struct file_system_type * type, int flags, const char *dev_name,void *data){
     if(! __sync_bool_compare_and_swap(&countFSmount,0,1)){
@@ -133,7 +132,6 @@ struct dentry * myFileSystem_mount(struct file_system_type * type, int flags, co
         printk("montaggio avvenuto con successo");
     return ret;
 }
-
 //funzione per lo smontaggio del filesystem
 static void myFileSystem_kill_sb(struct super_block *sb){
     if(! __sync_bool_compare_and_swap(&countFSmount,1,0)){
@@ -145,7 +143,6 @@ static void myFileSystem_kill_sb(struct super_block *sb){
     printk("file system smontato\n");
     return ;
 }
-
 //my file system type kernel 6.3 credo vada bene devo controllare nelle versioni più aggiornate
 static struct file_system_type myFileSystemType = {
     .owner=THIS_MODULE,
@@ -154,8 +151,38 @@ static struct file_system_type myFileSystemType = {
     .kill_sb=myFileSystem_kill_sb,//funzione di smontaggio del file system
     //.fs_flags= FS_NO_DCACHE, //controllare quali altri flag possono essere utili
 };
+//declare SYS_CALL
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4,17,0)
+__SYSCALL_DEFINEx(2, _put_data, char *, A, size_t, B){
+#else
+asmlinkage long sys_put_data(char* A, size_t B){
+#endif
+        put_data(A,B);
+        return 0;
+}
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4,17,0)
+static unsigned long sys_put_data = (unsigned long) __x64_sys_put_data;	
+#else
+#endif	
+
+unsigned long systemcall_table=0x0;
+module_param(systemcall_table,ulong,0660);
+
+int free_entries[15];
+module_param_array(free_entries,int,NULL,0660);
+
 
 int init_func(void){
+    //TO-DO: da incrementare il contatore del modulo!
+    //inserimento Systemcall
+    if(systemcall_table!=0){
+        cr0 = read_cr0();
+        unprotect_memory();
+        hacked_syscall_tbl[free_entries[0]] = (unsigned long*)sys_put_data;
+        protect_memory();
+	    printk("%s: a sys_call with 2 parameters has been installed as a trial on the sys_call_table at displacement %d\n",MODNAME,FIRST_NI_SYSCALL);	
+    }
     int  ret=register_filesystem(&myFileSystemType);
     printk("il valore della macro é %d\n",NBLOCK);
     if (likely(ret==0))

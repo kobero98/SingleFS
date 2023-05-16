@@ -1,0 +1,1 @@
+savedcmd_/home/kobero/Desktop/SOA_Progect/SingleFS/SystemCallFind/the_usctm.mod := printf '%s\n'   usctm.o ./lib/vtpmo.o | awk '!x[$$0]++ { print("/home/kobero/Desktop/SOA_Progect/SingleFS/SystemCallFind/"$$0) }' > /home/kobero/Desktop/SOA_Progect/SingleFS/SystemCallFind/the_usctm.mod

@@ -1,0 +1,1 @@
+savedcmd_/home/kobero/Desktop/SOA_Progect/SingleFS/SystemCallFind/modules.order := {   echo /home/kobero/Desktop/SOA_Progect/SingleFS/SystemCallFind/the_usctm.o; :; } > /home/kobero/Desktop/SOA_Progect/SingleFS/SystemCallFind/modules.order

@@ -1,0 +1,1 @@
+savedcmd_/home/kobero/Desktop/SOA_Progect/SingleFS/SystemCallFind/Module.symvers :=  scripts/mod/modpost  -a    -N -o /home/kobero/Desktop/SOA_Progect/SingleFS/SystemCallFind/Module.symvers -n -T /home/kobero/Desktop/SOA_Progect/SingleFS/SystemCallFind/modules.order -i Module.symvers -e 
