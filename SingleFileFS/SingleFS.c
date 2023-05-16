@@ -6,8 +6,10 @@
 #include <linux/mnt_idmapping.h>
 #include <linux/types.h>
 #include <linux/string.h>
+#include <linux/syscalls.h>
 
 #include "SingleFileSystem.h"
+#include "./../SystemCallFind/SystemCallFind.h"
 
 /*
     #ifdef MY_DEBUG
@@ -21,7 +23,9 @@ MODULE_AUTHOR("Matteo Federico");
 MODULE_DESCRIPTION("un semplice modulo iniziale");
 MODULE_VERSION("0.1");
 
-metadati_block_ram metadata_vector[NBLOCK];
+metadati_block_ram * testa_valid;
+metadati_block_ram * testa_invalid;
+static int ticketToWrite = 0;
 static int countFSmount = 0;
 //driver da implementare!
 static struct super_operations myFileSystem_super_ops = {};
@@ -29,31 +33,46 @@ static struct dentry_operations myFileSystem_dentry_ops={};
 static struct inode_operations myFileSystem_inode_ops = {};
 static struct file_operations myFileSystem_file_ops = {};
 static struct file_operations myFileSystem_dir_ops = {};
-void init_struct_block(struct buffer_head *,int );
+
+void inserimento_incoda(struct super_block *);
+void init_metadata(struct buffer_head *,int );
 void stampa_mvector(void);
 
+
 void stampa_mvector(){
-    printk("il ponter vector sta a: %p\n",metadata_vector);
-    for(int i=0;i<NBLOCK;i++){
-        printk("%d] %d %d %d \n",i,metadata_vector[i].time,metadata_vector[i].valid,metadata_vector[i].dimension);
+    metadata_block_ram *q;
+    for(q=testa_valid;q!=NULL;q=q->next){
+        printk("%d] %d %d %d \n",i,q->time,q->valid,q->dimension);
     }
 }
-
-void init_struct_block(struct buffer_head *b,int j){
-    printk("qua va 1.j?\n");
- /*   metadati_block_struct data_read = ((block_file_struct*) b->b_data)->block_information;
-    (data+j)->time = data_read.time;
-    printk("qua va 3.j?\n");
-    (data+j)->valid = data_read.valid;
-    (data+j)->dimension = data_read.dimension;
-    printk("qua va 3.j?\n");
-    (data+j)->index_block = j;
-    (data+j)->countLettore = 0;
-    (data+j)->countScrittore= 0;
-    printk("qua va 4.j?\n");
-    brelse(b);
-    */
-    return;
+void inserimento_incoda(metadata_block_ram ** doveInserire,metadata_block_ram*chiInserire){
+    if(likely(*doveInserire != NULL)){
+        (*doveInserire)->next=chiInserire
+    }else{ *doveInserire=chiInserire;}
+}
+void init_metadata(struct super_block * sb){
+    testa_valid=NULL;
+    testa_invalid=NULL;
+    q1=testa_valid;
+    q2=testa_invalid;
+    for(j=2;j<NBLOCK+2;j++){ 
+        buffer_head *b = sb_bread(sb,j);
+        metadata_block_ram *p= (metadata_block_ram*) kzalloc(sizeof(metadati_block_ram),0);
+        if(p==NULL) return;
+        metadati_block_struct data_read = ((block_file_struct*) b->b_data)->block_information;
+        p->valid = data_read.valid;
+        p->dimension = data_read.dimension;
+        p->index_block = j;
+        p->countLettore=0;
+        p->countScrittore=0;
+        p->next=NULL;
+        if(p->valid){
+            inserimento_incoda(&q1,p);
+        }else{
+            inserimento_incoda(&q2,p);
+        }
+        brelse(b);
+    }
 }
 //funzione per il riempimento del superblocco
 int myFileSystem_fill_sb(struct super_block *sb,void*data,int silent){
@@ -100,20 +119,7 @@ int myFileSystem_fill_sb(struct super_block *sb,void*data,int silent){
     if (!sb->s_root) return -ENOMEM;
     sb->s_root->d_op = &myFileSystem_dentry_ops;
     unlock_new_inode(root_inode);
-    //metadata_vector = (metadati_block_ram *) kmalloc(sizeof(metadati_block_ram)*NBLOCK,0);
-    if(metadata_vector == NULL) printk("errno \n");
-    for(int j=0;j<NBLOCK;j++){
-        //init_struct_block(sb_bread(sb,j+2),j);
-        b = sb_bread(sb,j+2);
-        metadati_block_struct data_read = ((block_file_struct*) b->b_data)->block_information;
-        metadata_vector[j].time = data_read.time;
-        metadata_vector[j].valid = data_read.valid;
-        metadata_vector[j].dimension = data_read.dimension;
-        metadata_vector[j].index_block = j+2;
-        metadata_vector[j].countLettore = 0;
-        metadata_vector[j].countScrittore= 0;
-        brelse(b);
-    }
+    init_metadata(sb);
     stampa_mvector();
     printk("metadatapointer: %p",metadata_vector);
     printk("mount avvenuta con successo\n");
@@ -153,9 +159,9 @@ static struct file_system_type myFileSystemType = {
 };
 //declare SYS_CALL
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4,17,0)
-__SYSCALL_DEFINEx(2, _put_data, char *, A, size_t, B){
+__SYSCALL_DEFINEx(2,_put_data, char *, A, size_t, B){
 #else
-asmlinkage long sys_put_data(char* A, size_t B){
+asmlinkage int sys_put_data(char* A, size_t B){
 #endif
         put_data(A,B);
         return 0;
@@ -168,10 +174,24 @@ static unsigned long sys_put_data = (unsigned long) __x64_sys_put_data;
 
 unsigned long systemcall_table=0x0;
 module_param(systemcall_table,ulong,0660);
-
 int free_entries[15];
 module_param_array(free_entries,int,NULL,0660);
+unsigned long cr0;
+static inline void write_cr0_forced(unsigned long val){
+    unsigned long __force_order;
 
+    /* __asm__ __volatile__( */
+    asm volatile(
+        "mov %0, %%cr0"
+        : "+r"(val), "+m"(__force_order));
+}
+static inline void protect_memory(void){
+    write_cr0_forced(cr0);
+}
+
+static inline void unprotect_memory(void){
+    write_cr0_forced(cr0 & ~X86_CR0_WP);
+}
 
 int init_func(void){
     //TO-DO: da incrementare il contatore del modulo!
@@ -179,9 +199,10 @@ int init_func(void){
     if(systemcall_table!=0){
         cr0 = read_cr0();
         unprotect_memory();
-        hacked_syscall_tbl[free_entries[0]] = (unsigned long*)sys_put_data;
+        unsigned long * sys_call_table = (void*) systemcall_table; 
+        sys_call_table[free_entries[0]] = (unsigned long*)sys_put_data;
         protect_memory();
-	    printk("%s: a sys_call with 2 parameters has been installed as a trial on the sys_call_table at displacement %d\n",MODNAME,FIRST_NI_SYSCALL);	
+	    printk("%s: a sys_call with 2 parameters has been installed as a trial on the sys_call_table at displacement\n",MOD_NAME);	
     }
     int  ret=register_filesystem(&myFileSystemType);
     printk("il valore della macro é %d\n",NBLOCK);

@@ -75,6 +75,6 @@ extern const struct file_operations onefilefs_file_operations;
 // dir.c
 extern const struct file_operations onefilefs_dir_operations;
 extern void stampa_mvector(void);
-extern int put_data(char * ,size_t);
+extern int put_data(char * source,size_t size);
 extern int get_data(int ,char * ,size_t );
 extern int invalidate_data(int );
