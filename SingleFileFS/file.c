@@ -8,7 +8,7 @@
 
 #include "SingleFileSystem.h"
 
-
+/*
 ssize_t onefilefs_read(struct file * filp, char __user * buf, size_t len, loff_t * off) {
 
     printk("sto leggendo i dati\n");
@@ -111,7 +111,7 @@ ssize_t myfileops_read(struct file * filp, char __user * buf, size_t len, loff_t
         ((myfiledata_struct*)filp->private_data)->num=maxTime;
     return ret;
 }
-
+*/
 int myfileops_open(struct inode * inode, struct file * file){
     myfiledata_struct * fdata=(myfiledata_struct*) kzalloc(sizeof(myfiledata_struct),0);
     if(fdata == NULL) printk("Error\n");
@@ -244,7 +244,7 @@ const struct inode_operations onefilefs_inode_ops = {
 
 const struct file_operations onefilefs_file_operations = {
     .owner = THIS_MODULE,
-    .read = myfileops_read,
+    //.read = myfileops_read,
     //.read = onefilefs_read,
     .open = myfileops_open,
     .release = myfileops_release,

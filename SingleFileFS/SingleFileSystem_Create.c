@@ -7,10 +7,7 @@
 #include <sys/stat.h>
 #include <stdint.h>
 #include <string.h>
-
 #include "SingleFileSystem.h"
-
-
 
 int main(int argc,char *argv[]){
     int fd, nbytes;
@@ -19,22 +16,86 @@ int main(int argc,char *argv[]){
     struct_MyInode root_inode;
     struct_MyInode file_inode;
     char * file_body= "volsi cosi cola come si pote dove si vuole\n";
-
     if(argc != 2){
         return -1;
     }
     fd= open(argv[1],O_RDWR);
     if(fd == -1) return -1;
-
     sb.magic = MAGICNUMBER;
     sb.version = 0.1;
     sb.nblock = 10;
-
+    sb.nBlockMetadata=1;
+    sb.first.index=0;
+    //sb.first.sb=0;
+    sb.last.index=7;
+    //sb.last.sb=0;
     ret = write(fd,(char * )&sb, sizeof(sb));
     if(ret != 4096) {
         close(fd);
         return -ret;
     }
+    
+    struct_sb_metadata metadata;
+    //metadata.vet[0].succ.sb=0;
+    metadata.vet[0].succ.index=1;
+    //metadata.vet[0].prec.sb=0;
+    metadata.vet[0].prec.index=-1;
+    metadata.vet[0].valid=1;
+    
+    //metadata.vet[1].succ.sb=0;
+    metadata.vet[1].succ.index=4;
+    //metadata.vet[1].prec.sb=0;
+    metadata.vet[1].prec.index=0;
+    metadata.vet[1].valid=1;
+    
+    //metadata.vet[2].succ.sb=0;
+    metadata.vet[2].succ.index=0;
+    //metadata.vet[2].prec.sb=0;
+    metadata.vet[2].prec.index=0;
+    metadata.vet[2].valid=0;
+
+    //metadata.vet[3].succ.sb=0;
+    metadata.vet[3].succ.index=8;
+    //metadata.vet[3].prec.sb=0;
+    metadata.vet[3].prec.index=5;
+    metadata.vet[3].valid=1;
+    
+    //metadata.vet[4].succ.sb=0;
+    metadata.vet[4].succ.index=5;
+    //metadata.vet[4].prec.sb=0;
+    metadata.vet[4].prec.index=1;
+    metadata.vet[4].valid=0;
+    
+    //metadata.vet[5].succ.sb=0;
+    metadata.vet[5].succ.index=3;
+    //metadata.vet[5].prec.sb=0;
+    metadata.vet[5].prec.index=4;
+    metadata.vet[5].valid=1;
+
+    //metadata.vet[6].succ.sb=0;
+    metadata.vet[6].succ.index=7;
+    //metadata.vet[6].prec.sb=0;
+    metadata.vet[6].prec.index=8;
+    metadata.vet[6].valid=0;
+    
+    //metadata.vet[7].succ.sb=0;
+    metadata.vet[7].succ.index=-1;
+    //metadata.vet[7].prec.sb=0;
+    metadata.vet[7].prec.index=6;
+    metadata.vet[7].valid=0;
+
+    //metadata.vet[8].succ.sb=0;
+    metadata.vet[8].succ.index=6;
+    //metadata.vet[8].prec.sb=0;
+    metadata.vet[8].prec.index=3;
+    metadata.vet[8].valid=0;
+
+    ret = write(fd,(char * )&metadata, sizeof(metadata));
+    if(ret != 4096) {
+        close(fd);
+        return -ret;
+    }
+
     file_inode.mode = S_IFREG;
     file_inode.inode_number = 1;
     file_inode.file_size = strlen(file_body)+1;
@@ -51,38 +112,13 @@ int main(int argc,char *argv[]){
         close(fd);
         return -1;
     }
-    block_file_struct p;
-    p.block_information.time = 1;
-    p.block_information.valid = 0x1;
-    p.block_information.dimension = strlen(file_body)+1;
-    strncpy(p.dati,file_body,strlen(file_body));
-    ret = write(fd,(char*)&p,sizeof(p));
-    printf("quanto ha scritto:%d %d\n",ret,sizeof(p));
-    printf("%d %d\n",strlen(file_body),p.block_information.valid);
+    int i;
+    for(i=0;i<5;i++){
+        block_file_struct p;
+        p.size = strlen(file_body)+1;
+        strncpy(p.dati,file_body,strlen(file_body));
+        ret = write(fd,(char*)&p,sizeof(p));
+    }
     
-    p.block_information.time = 2;
-    p.block_information.valid = 0x1;
-    p.block_information.dimension = strlen(file_body)+1;
-    strncpy(p.dati,file_body,strlen(file_body));
-    ret = write(fd,(char*)&p,sizeof(p));
-    printf("quanto ha scritto:%d %d\n",ret,sizeof(p));
-    printf("%d %d\n",strlen(file_body),p.block_information.valid); 
-
-    p.block_information.time = 3;
-    p.block_information.valid = 0x0;
-    p.block_information.dimension = strlen(file_body)+1;
-    strncpy(p.dati,file_body,strlen(file_body));
-    ret = write(fd,(char*)&p,sizeof(p));
-    printf("quanto ha scritto:%d %d\n",ret,sizeof(p));
-    printf("%d %d\n",strlen(file_body),p.block_information.valid);      
-   
-    p.block_information.time = 4;
-    p.block_information.valid = 0x1;
-    p.block_information.dimension = strlen(file_body)+1;
-    strncpy(p.dati,file_body,strlen(file_body));
-    ret = write(fd,(char*)&p,sizeof(p));
-    printf("quanto ha scritto:%d %d\n",ret,sizeof(p));
-    printf("%d %d\n",strlen(file_body),p.block_information.valid);
-    printf("tutto avvenuto con successo\n");
     return 0;
 }

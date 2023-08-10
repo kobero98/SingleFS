@@ -13,9 +13,9 @@ insmod:
 insmod-extern:
 	insmod SingleFileFS/SingleFileSystem.ko systemcall_table=$(systemcalltable) free_entries=$(array_free_entries)
 rmmod-extern:
-	rmmod SingleFileFS/SingleFileSystem.ko
+	rmmod -f SingleFileFS/SingleFileSystem.ko
 rmmod:
-	rmmod SingleFileSystem.ko
+	rmmod -f SingleFileSystem.ko
 compile-extern:
 	make -C $(KDIR) M=$(PWD)/SingleFileFS modules
 clean-extern:
