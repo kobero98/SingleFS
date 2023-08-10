@@ -3,3 +3,14 @@
 ./*.mod*
 ./*.o
 ./*.ko
+./.*
+./SingleFileFS/a.out
+./SingleFileFS/*.mod*
+./SingleFileFS/*.o
+./SingleFileFS/*.ko
+./SingleFileFS/a.out
+./SystemCallFind/*.mod*
+./SystemCallFind/*.o
+./SystemCallFind/*.ko
+./user/*.out
+
