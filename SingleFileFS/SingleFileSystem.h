@@ -48,9 +48,12 @@ typedef struct block_file_struct{
     uint64_t size;
     char dati[MAXBLOCKDATA]; 
 }block_file_struct;
+
+//NB l'indice del blocco é ricavato tramite la posizione 
+//come sb*DIMENSIONE+index
 typedef struct posizione{
-    //uint64_t sb; //non serve
-    int index;
+    int sb; //non serve
+    int offset; //offset
 }posizione;
 typedef struct elementoVettoreMetadati{
     posizione succ;
@@ -72,7 +75,7 @@ typedef struct struct_sb_information{
 
 #define DIMENSIONEVETTORE (4*1024)/sizeof(elementoVettoreMetadati)
 #define DIMENSIONEPADDING (4*1024 - DIMENSIONEVETTORE*sizeof(elementoVettoreMetadati))
-#define NUMEROMETADATABLOCK NBLOCK/DIMENSIONEVETTORE+1*((NBLOCK % 64)!=0)
+#define NUMEROMETADATABLOCK (NBLOCK/DIMENSIONEVETTORE+1*((NBLOCK % 64)!=0))
 typedef struct struct_sb_metadata{
     elementoVettoreMetadati vet[DIMENSIONEVETTORE]; //porta un pò di frammentazione interna
     char padding[DIMENSIONEPADDING];

@@ -94,24 +94,26 @@ void init_metadata(struct super_block * sb,struct_sb_information * mysb){
     //leggo i vari blocchi di metadati
     struct buffer_head * bh [mysb->nBlockMetadata];
     struct_sb_metadata * sbdata[mysb->nBlockMetadata];
+    printk("dimensione nBlockMetadata: %d\n",mysb->nBlockMetadata);
     for(j=0;j<mysb->nBlockMetadata;j++){
         bh[j]=sb_bread(sb,j+1);
         sbdata[j]=(struct_sb_metadata *)bh[j]->b_data;
     }
-    
+    int k=0;
     posizione i = mysb->first;
-    while(i.index>=0){
-        printk("indice %d",i.index);
-        if(sbdata[i.index/NUMEROMETADATABLOCK]->vet[i.index%NUMEROMETADATABLOCK].valid==1){
+    while(i.offset>=0 &&  k<8 ){
+        printk("indice %d, sb_i %d, NUm %d\n",i.offset,i.sb,mysb->nBlockMetadata);
+        if(sbdata[i.sb]->vet[i.offset].valid==1){
             metadati_block_element* e=(metadati_block_element*)kmalloc(sizeof(metadati_block_element),GFP_KERNEL);
-            e->block.index_block=i.index; //+i.sb*DIMENSIONEVETTORE;
+            e->block.index_block=i.offset+i.sb*DIMENSIONEVETTORE;
             e->block.time=getTime(); //potevo anche asseganre il tempo alla struttura del blocco ma supponenodi sia tutto ordinato funziona lo stesso
             e->block.valid=1;
             e->next=NULL;
-            setBit(i.index);
+            setBit(e->block.index_block);
             inserimento_incoda(e);
         }
-        i=(sbdata[i.index/NUMEROMETADATABLOCK])->vet[i.index].succ;
+        k++;
+        i=sbdata[i.sb]->vet[i.offset].succ;
     }
     printk("exit from cicle\n");
     //qui rilascio i superblochi ma forse non serve
@@ -182,7 +184,7 @@ struct dentry * myFileSystem_mount(struct file_system_type * type, int flags, co
         printk("non é possibile montare il file system\n");
         return ERR_PTR(-EIO);
     }
-    struct dentry * ret =  mount_bdev(type,flags,dev_name,data,myFileSystem_fill_sb); //forse bisogna utilizzare mount_nodev poi studio meglio.
+    struct dentry * ret =  (type,flags,dev_name,data,myFileSystem_fill_sb); //forse bisogna utilizzare mount_nodev poi studio meglio.
     if (unlikely(IS_ERR(ret)))
         printk("Errore durante il montaggio del filesystem");
     else

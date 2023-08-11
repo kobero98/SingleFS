@@ -25,9 +25,9 @@ int main(int argc,char *argv[]){
     sb.version = 0.1;
     sb.nblock = 10;
     sb.nBlockMetadata=1;
-    sb.first.index=0;
+    sb.first.offset=0;
     //sb.first.sb=0;
-    sb.last.index=7;
+    sb.last.offset=7;
     //sb.last.sb=0;
     ret = write(fd,(char * )&sb, sizeof(sb));
     if(ret != 4096) {
@@ -36,58 +36,58 @@ int main(int argc,char *argv[]){
     }
     
     struct_sb_metadata metadata;
-    //metadata.vet[0].succ.sb=0;
-    metadata.vet[0].succ.index=1;
-    //metadata.vet[0].prec.sb=0;
-    metadata.vet[0].prec.index=-1;
+    metadata.vet[0].succ.sb=0;
+    metadata.vet[0].succ.offset=1;
+    metadata.vet[0].prec.sb=0;
+    metadata.vet[0].prec.offset=-1;
     metadata.vet[0].valid=1;
     
-    //metadata.vet[1].succ.sb=0;
-    metadata.vet[1].succ.index=4;
-    //metadata.vet[1].prec.sb=0;
-    metadata.vet[1].prec.index=0;
+    metadata.vet[1].succ.sb=0;
+    metadata.vet[1].succ.offset=4;
+    metadata.vet[1].prec.sb=0;
+    metadata.vet[1].prec.offset=0;
     metadata.vet[1].valid=1;
     
-    //metadata.vet[2].succ.sb=0;
-    metadata.vet[2].succ.index=0;
-    //metadata.vet[2].prec.sb=0;
-    metadata.vet[2].prec.index=0;
+    metadata.vet[2].succ.sb=0;
+    metadata.vet[2].succ.offset=0;
+    metadata.vet[2].prec.sb=0;
+    metadata.vet[2].prec.offset=0;
     metadata.vet[2].valid=0;
 
-    //metadata.vet[3].succ.sb=0;
-    metadata.vet[3].succ.index=8;
-    //metadata.vet[3].prec.sb=0;
-    metadata.vet[3].prec.index=5;
+    metadata.vet[3].succ.sb=0;
+    metadata.vet[3].succ.offset=8;
+    metadata.vet[3].prec.sb=0;
+    metadata.vet[3].prec.offset=5;
     metadata.vet[3].valid=1;
     
-    //metadata.vet[4].succ.sb=0;
-    metadata.vet[4].succ.index=5;
-    //metadata.vet[4].prec.sb=0;
-    metadata.vet[4].prec.index=1;
+    metadata.vet[4].succ.sb=0;
+    metadata.vet[4].succ.offset=5;
+    metadata.vet[4].prec.sb=0;
+    metadata.vet[4].prec.offset=1;
     metadata.vet[4].valid=0;
     
-    //metadata.vet[5].succ.sb=0;
-    metadata.vet[5].succ.index=3;
-    //metadata.vet[5].prec.sb=0;
-    metadata.vet[5].prec.index=4;
+    metadata.vet[5].succ.sb=0;
+    metadata.vet[5].succ.offset=3;
+    metadata.vet[5].prec.sb=0;
+    metadata.vet[5].prec.offset=4;
     metadata.vet[5].valid=1;
 
-    //metadata.vet[6].succ.sb=0;
-    metadata.vet[6].succ.index=7;
-    //metadata.vet[6].prec.sb=0;
-    metadata.vet[6].prec.index=8;
+    metadata.vet[6].succ.sb=0;
+    metadata.vet[6].succ.offset=7;
+    metadata.vet[6].prec.sb=0;
+    metadata.vet[6].prec.offset=8;
     metadata.vet[6].valid=0;
     
-    //metadata.vet[7].succ.sb=0;
-    metadata.vet[7].succ.index=-1;
-    //metadata.vet[7].prec.sb=0;
-    metadata.vet[7].prec.index=6;
+    metadata.vet[7].succ.sb=0;
+    metadata.vet[7].succ.offset=-1;
+    metadata.vet[7].prec.sb=0;
+    metadata.vet[7].prec.offset=6;
     metadata.vet[7].valid=0;
 
-    //metadata.vet[8].succ.sb=0;
-    metadata.vet[8].succ.index=6;
-    //metadata.vet[8].prec.sb=0;
-    metadata.vet[8].prec.index=3;
+    metadata.vet[8].succ.sb=0;
+    metadata.vet[8].succ.offset=6;
+    metadata.vet[8].prec.sb=0;
+    metadata.vet[8].prec.offset=3;
     metadata.vet[8].valid=0;
 
     ret = write(fd,(char * )&metadata, sizeof(metadata));

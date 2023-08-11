@@ -5,33 +5,48 @@
 #include <linux/buffer_head.h>
 
 #include "SingleFileSystem.h"
-
+void index_to_posizione(posizione * i,int index){
+    i->sb= index / NUMEROMETADATABLOCK;
+    i->offset = index - i->sb*NUMEROMETADATABLOCK;
+}
+int confronto_posizioni(posizione i,posizione j){
+    return i.sb==j.sb && i.offset==j.offset;
+}
 void update_memory_struct(int index){
-    int index_mysb = index/NUMEROMETADATABLOCK;
+    posizione mypos;
+    index_to_posizione(&mypos,index);
+    
     struct buffer_head * bh_meta = sb_bread(the_sb,0);
-    struct_sb_information * mysb = (struct_sb_information *) bh_meta->b_data;
-    posizione last = mysb->last;
-    posizione first = mysb->first;
-    int index_sb_last = last.index / NUMEROMETADATABLOCK;
+    struct_sb_information * sb_meta = (struct_sb_information *) bh_meta->b_data;
+    posizione last = sb_meta->last;
+    posizione first = sb_meta->first;
+
     struct buffer_head * bh[2];
     struct_sb_metadata * metadata_block[5];
 
-    bh[0]=sb_bread(the_sb,mysb+1);
+    bh[0]=sb_bread(the_sb,mypos.sb+1);
     metadata_block[0]=(struct_sb_metadata*) bh[0]->b_data;
-
+    
     //valido il bit
-    metadata_block[0]->vet[index%NUMEROMETADATABLOCK].valid=1;
-    posizione prec=metadata_block[0]->vet[index%NUMEROMETADATABLOCK].prec;
-    posizione succ=metadata_block[0]->vet[index%NUMEROMETADATABLOCK].succ;
-    int index_sb_succ=prec.index/NUMEROMETADATABLOCK;
-    int index_sb_prec=succ.index/NUMEROMETADATABLOCK;
+    metadata_block[0]->vet[mypos.offset].valid=1;
+    posizione prec = metadata_block[0]->vet[mypos.offset].prec;
+    posizione succ = metadata_block[0]->vet[mypos.offset].succ;
     //in caso il file system sia nuovo
-    if( last.index == -1){
+    if( last.offset == -1){
         printk("rete nuova\n");
-        mysb->last.index=index;
-        mysb->first.index=index;
-        metadata_block[0]->vet[index % NUMEROMETADATABLOCK].prec.index=-1;
-        metadata_block[0]->vet[index % NUMEROMETADATABLOCK].succ.index=-1;
+
+        sb_meta->last.offset=mypos.offset;
+        sb_meta->last.sb=mypos.sb;
+
+        sb_meta->first.offset=mypos.offset;
+        sb_meta->first.sb=mypos.sb;
+
+        metadata_block[0]->vet[mypos.offset].prec.offset=-1;
+        metadata_block[0]->vet[mypos.offset].prec.sb=-1;
+
+        metadata_block[0]->vet[mypos.offset].succ.offset=-1;
+        metadata_block[0]->vet[mypos.offset].succ.sb=-1;
+
         mark_buffer_dirty(bh[0]);
         mark_buffer_dirty(bh_meta);
         brelse(bh[0]);
@@ -39,7 +54,7 @@ void update_memory_struct(int index){
         return;
     }
     //in caso sia già l'ultimo ad essere inserito
-    if(index == last.index) {
+    if(confronto_posizioni(mypos,last)) {
         printk("l'indice é l'ultimo\n");
         mark_buffer_dirty(bh[0]);
         brelse(bh[0]);
@@ -48,57 +63,72 @@ void update_memory_struct(int index){
     }
     //fase di sganciamento del nodo
     //in caso sia il primo a dover essere inserito
-    if(index == first.index){
+    if(confronto_posizioni(mypos,first)){
         printk("l'indice é il primo\n");
-        mysb->first.index = succ.index;
+        sb_meta->first.sb = succ.sb;
+        sb_meta->first.offset = succ.offset;
         //modifico il successore
-        if(index_sb_succ == index_mysb){
-            metadata_block[0]->vet[succ.index % NUMEROMETADATABLOCK].prec.index=-1;
+        if(succ.sb == mypos.sb){
+            metadata_block[0]->vet[succ.offset].prec.offset=-1;
+            metadata_block[0]->vet[succ.offset].prec.sb=-1;
         }else{
-            bh[1]=sb_bread(the_sb,index_sb_succ+1);
+            bh[1]=sb_bread(the_sb,succ.sb+1);
             metadata_block[1]=(struct_sb_metadata*) bh[1]->b_data;          
-            metadata_block[1]->vet[succ.index % NUMEROMETADATABLOCK].prec.index=-1;
+            metadata_block[1]->vet[succ.offset].prec.offset=-1;
+            metadata_block[1]->vet[succ.offset].prec.sb=-1;
             mark_buffer_dirty(bh[1]);
             brelse(bh[1]);
         }
-        metadata_block[0]->vet[index % NUMEROMETADATABLOCK].succ.index=-1;
+        metadata_block[0]->vet[mypos.offset].succ.offset=-1;
     }
-    if(index_sb_succ!=index_sb_prec){
+    if(!confronto_posizioni(succ,prec)){
         printk(" é in mezzo\n");
         //modifico il successore
-        if(index_sb_succ == index_mysb){
-            metadata_block[0]->vet[succ.index % NUMEROMETADATABLOCK].prec.index=prec.index;
+        if(mypos.sb == succ.sb){
+            metadata_block[0]->vet[succ.offset].prec.sb=prec.sb;
+            metadata_block[0]->vet[succ.offset].prec.offset=prec.offset;
         }else{
-            bh[1]=sb_bread(the_sb,index_sb_succ+1);
+            bh[1]=sb_bread(the_sb,succ.sb+1);
             metadata_block[1]=(struct_sb_metadata*) bh[1]->b_data;          
-            metadata_block[1]->vet[succ.index % NUMEROMETADATABLOCK].prec.index=-1;
+            metadata_block[1]->vet[succ.offset].prec.offset=prec.offset;
+            metadata_block[1]->vet[succ.offset].prec.sb=prec.sb;
             mark_buffer_dirty(bh[1]);
             brelse(bh[1]);
         }
-        if(index_sb_prec == index_mysb){
-            metadata_block[0]->vet[prec.index % NUMEROMETADATABLOCK].prec.index=succ.index;
+        if(prec.sb == mypos.sb){
+            metadata_block[0]->vet[prec.offset].prec.offset=succ.offset;
+            metadata_block[0]->vet[prec.offset].prec.sb=succ.sb;
         }else{
-            bh[1]=sb_bread(the_sb,index_sb_prec+1);
+            bh[1]=sb_bread(the_sb,prec.sb+1);
             metadata_block[1]=(struct_sb_metadata*) bh[1]->b_data;          
-            metadata_block[1]->vet[succ.index % NUMEROMETADATABLOCK].prec.index=succ.index;
+            metadata_block[1]->vet[succ.offset].prec.offset=succ.offset;
+            metadata_block[1]->vet[succ.offset].prec.sb=succ.sb;
             mark_buffer_dirty(bh[1]);
             brelse(bh[1]);
         }
-        metadata_block[0]->vet[index % NUMEROMETADATABLOCK].succ.index=-1;
-        metadata_block[0]->vet[index % NUMEROMETADATABLOCK].prec.index=-1;
+        
+        metadata_block[0]->vet[mypos.offset].succ.offset=-1;
+        metadata_block[0]->vet[mypos.offset].succ.sb=-1;
+        metadata_block[0]->vet[mypos.offset].prec.offset=-1;
+        metadata_block[0]->vet[mypos.offset].prec.sb=-1;
     }
     printk("Ho scollegato\n");
-    if(index_mysb == index_sb_last){
-        metadata_block[0]->vet[last.index % NUMEROMETADATABLOCK].succ.index=index;
+    if(mypos.sb == last.sb){
+        metadata_block[0]->vet[last.offset].succ.offset=mypos.offset;
+        metadata_block[0]->vet[last.offset].succ.sb=mypos.sb;
     }else{
-            bh[1]=sb_bread(the_sb,index_sb_last+1);
+            bh[1]=sb_bread(the_sb,last.sb+1);
             metadata_block[1]=(struct_sb_metadata*) bh[1]->b_data;          
-            metadata_block[1]->vet[last.index % NUMEROMETADATABLOCK].succ.index=index;
+            metadata_block[1]->vet[last.offset].succ.offset=mypos.offset;
+            metadata_block[1]->vet[last.offset].succ.sb=mypos.sb;
             mark_buffer_dirty(bh[1]);
             brelse(bh[1]);
     }
-    mysb->last.index=index;
-    metadata_block[0]->vet[index % NUMEROMETADATABLOCK].succ.index=-1;
+    sb_meta->last.offset=mypos.offset;
+    sb_meta->last.sb=mypos.sb;
+    metadata_block[0]->vet[mypos.offset].succ.offset=-1;
+    printk("Ho ricollegato\n");
+
     mark_buffer_dirty(bh[0]);
     mark_buffer_dirty(bh_meta);
     brelse(bh[0]);
@@ -158,7 +188,6 @@ TakeTicket:
         size=size & (MAXBLOCKDATA);
         struct buffer_head * bh=sb_bread(the_sb,index+NUMEROMETADATABLOCK+2);
         block_file_struct* block=(block_file_struct*) bh->b_data;
-        block->block_information.time=q->block.time;
         ret = copy_from_user(block->dati,source,size);
         block->size=size-ret;
         mark_buffer_dirty(bh);
