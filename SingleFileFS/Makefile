@@ -1,7 +1,7 @@
 obj-m := SingleFileSystem.o
 SingleFileSystem-objs += file.o dir.o SingleFS.o systemcallFS.o
 KDIR := /lib/modules/$(shell uname -r)/build
-EXTRA_CFLAGS:= -D NBLOCK=10
+EXTRA_CFLAGS:= -D NBLOCK=100
 systemcalltable := $(shell cat /sys/module/the_usctm/parameters/sys_call_table_address)
 array_free_entries := $(shell cat /sys/module/the_usctm/parameters/free_entries) 
 all:

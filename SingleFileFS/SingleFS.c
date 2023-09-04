@@ -7,16 +7,9 @@
 #include <linux/types.h>
 #include <linux/string.h>
 #include <linux/syscalls.h>
-
 #include "SingleFileSystem.h"
 #include "./../SystemCallFind/SystemCallFind.h"
-/*
-    #ifdef MY_DEBUG
-    #define AUDIT if(1)
-    #else
-    #define AUDIT if(0)
-    #endif
-*/
+
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Matteo Federico");
 MODULE_DESCRIPTION("un semplice modulo iniziale");
@@ -26,7 +19,6 @@ metadati_block_element * testa;
 metadati_block_element * coda;
 atomic_register * info;
 struct super_block * the_sb;
-static int ticketToWrite = 0;
 static int countFSmount = 0;
 
 //driver da implementare!
@@ -38,8 +30,13 @@ static struct file_operations myFileSystem_dir_ops = {};
 
 void inserimento_incoda(metadati_block_element * );
 void init_metadata(struct super_block *,struct_sb_information* );
-void printBitMask(void);
 int trovaBit(void);
+void printBitMask(void);
+
+void printBitMask(void){
+    printk("Dim BitMask: %d\n",DIMENSIONEBITMASK);
+    for(int i=0;i<DIMENSIONEBITMASK;i++) printk("Bitmask: %lld\n",info->bitmask[i]);
+}
 void inserimento_incoda(metadati_block_element* elemento){
     if(likely(testa != NULL)){
         coda->next=elemento;
@@ -49,22 +46,33 @@ void inserimento_incoda(metadati_block_element* elemento){
         coda=testa;
     }
 }
-void setBit(int index){
-    int i= index/64;
-    __sync_fetch_and_or(&(info->bitmask[i]),(1 << (index%64)));
-    printBitMask();    
 
+//imposta un bit a 1 della bit mask corrispondente
+void setBitUP(int index){
+    int i= index/64;
+    __sync_fetch_and_or(&(info->bitmask[i]),(1 << (index%64)));    
+    printBitMask();
+}
+//imposta un bit a 0 della bit mask corrispondente
+void setBitDown(int index){
+    int i= index/64;
+    uint64_t x = ~(1 << (index%64));
+    __sync_fetch_and_and(&(info->bitmask[i]),x);
+    printBitMask();
 }
 //verifica il valore del bit del blocco
+//torna 1 se nella bitmask il bit index é 1
+//torna 0 se nella bitmask il bit index é 0 
 int checkBit(int index){
-    int i,pos;
+    int i;
+    uint64_t pos;
     i=index/64;
     pos = 1 << (index%64);
     return (info->bitmask[i] & pos) == pos;
-
 }
 //trova un blocco con bit pari a 0
 int trovaBit(){
+    printBitMask();
     int i;
     int index=-1;
     for(i=0;i<NBLOCK;i++){
@@ -74,13 +82,6 @@ int trovaBit(){
         }
     }
     return index;
-}
-void printBitMask(){
-    int i;
-    printk("BitMask\n");
-    for(i=0;i<DIMENSIONEBITMASK;i++){
-        printk("%d] %d",i,info->bitmask[i]);
-    }
 }
 void init_metadata(struct super_block * sb,struct_sb_information * mysb){
     int j;
@@ -94,25 +95,21 @@ void init_metadata(struct super_block * sb,struct_sb_information * mysb){
     //leggo i vari blocchi di metadati
     struct buffer_head * bh [mysb->nBlockMetadata];
     struct_sb_metadata * sbdata[mysb->nBlockMetadata];
-    printk("dimensione nBlockMetadata: %d\n",mysb->nBlockMetadata);
     for(j=0;j<mysb->nBlockMetadata;j++){
         bh[j]=sb_bread(sb,j+1);
         sbdata[j]=(struct_sb_metadata *)bh[j]->b_data;
     }
-    int k=0;
     posizione i = mysb->first;
-    while(i.offset>=0 &&  k<8 ){
+    while(i.offset>=0){
         printk("indice %d, sb_i %d, NUm %d\n",i.offset,i.sb,mysb->nBlockMetadata);
         if(sbdata[i.sb]->vet[i.offset].valid==1){
             metadati_block_element* e=(metadati_block_element*)kmalloc(sizeof(metadati_block_element),GFP_KERNEL);
             e->block.index_block=i.offset+i.sb*DIMENSIONEVETTORE;
             e->block.time=getTime(); //potevo anche asseganre il tempo alla struttura del blocco ma supponenodi sia tutto ordinato funziona lo stesso
-            e->block.valid=1;
             e->next=NULL;
-            setBit(e->block.index_block);
+            setBitUP(e->block.index_block);
             inserimento_incoda(e);
         }
-        k++;
         i=sbdata[i.sb]->vet[i.offset].succ;
     }
     printk("exit from cicle\n");
@@ -120,8 +117,10 @@ void init_metadata(struct super_block * sb,struct_sb_information * mysb){
     for(j=0;j<mysb->nBlockMetadata;j++){
         brelse(bh[j]);
     }
-    info->atomic_entry=0;
-    info->atomic_exit=0;
+    registro_atomico* reg=(registro_atomico*)kmalloc(sizeof(registro_atomico),GFP_KERNEL);
+    reg->num_entry=0;
+    reg->num_exit=0;
+    info->reg=reg;
     info->lockScrittore=0;
     info->lockInvalid=0;
     info->testa=testa;
@@ -146,9 +145,8 @@ int myFileSystem_fill_sb(struct super_block *sb,void*data,int silent){
     magic = mysb->magic;
     nblock = mysb->nblock;
     brelse(bh);
-    printk("magic:%ld, nblock:%ld\n",magic,nblock);
     if(magic != sb->s_magic) return -EBADF;
-    //if(nblock != NBLOCK) return -EBADF; //questa da correggere
+    if(nblock != NBLOCK) return -EBADF; //questa da correggere
     sb->s_fs_info = NULL;
     sb->s_op = &myFileSystem_super_ops;
     //ora creo l'inode
@@ -180,11 +178,11 @@ int myFileSystem_fill_sb(struct super_block *sb,void*data,int silent){
 }
 //funzione per il montaggio del filesystem
 struct dentry * myFileSystem_mount(struct file_system_type * type, int flags, const char *dev_name,void *data){
-    if(! __sync_bool_compare_and_swap(&countFSmount,0,1)){
+    if(!__sync_bool_compare_and_swap(&countFSmount,0,1)){
         printk("non é possibile montare il file system\n");
         return ERR_PTR(-EIO);
     }
-    struct dentry * ret =  (type,flags,dev_name,data,myFileSystem_fill_sb); //forse bisogna utilizzare mount_nodev poi studio meglio.
+    struct dentry * ret =  mount_bdev(type,flags,dev_name,data,myFileSystem_fill_sb); //forse bisogna utilizzare mount_nodev poi studio meglio.
     if (unlikely(IS_ERR(ret)))
         printk("Errore durante il montaggio del filesystem");
     else
@@ -194,8 +192,8 @@ struct dentry * myFileSystem_mount(struct file_system_type * type, int flags, co
 //funzione per lo smontaggio del filesystem
 static void myFileSystem_kill_sb(struct super_block *sb){
     if(! __sync_bool_compare_and_swap(&countFSmount,1,0)){
-        printk("non é possibile smontare il file system\n");
-        return ;
+        printk("file system non montato\n");
+        return;
     }
     //free list valid
     metadati_block_element *p;
@@ -223,18 +221,31 @@ __SYSCALL_DEFINEx(2,_put_data, char *, A, size_t, B){
 #else
 asmlinkage int sys_put_data(char* A, size_t B){
 #endif
+        if(!countFSmount){
+            printk("Errore: Filesystem non montato\n");
+            return -ENODEV;
+        }
+        if(B>MAXBLOCKDATA || B<=0){
+            return -EINVAL;
+        }
         int ret;
-        printk("put\n");
         ret=put_data(A,B);
         return ret;
 }
+
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4,17,0)
 __SYSCALL_DEFINEx(3,_get_data,int, A ,char *, B, size_t, C){
 #else
 asmlinkage int sys_get_data(int A, char* B, size_t C){
 #endif
+        if(!countFSmount){
+            printk("Errore: Filesystem non montato\n");
+            return -ENODEV;
+        }
+        if(A<0 || A>=NBLOCK){
+            return -EINVAL;
+        }
         int ret;
-        printk("get\n");
         ret=get_data(A,B,C);
         return ret;
 }
@@ -243,24 +254,27 @@ __SYSCALL_DEFINEx(1,_invalidate_data, int, A){
 #else
 asmlinkage int sys_invalidate_data(int A){
 #endif
+        if(!countFSmount){
+            printk("Errore: Filesystem non montato\n");
+            return -ENODEV;
+        }
         int ret;
-        printk("invalidate\n");
         ret=invalidate_data(A);
         return ret;
 }
-
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4,17,0)
 static unsigned long sys_get_data = (unsigned long) __x64_sys_get_data;	
 static unsigned long sys_put_data = (unsigned long) __x64_sys_put_data;
 static unsigned long sys_invalidate_data = (unsigned long) __x64_sys_invalidate_data;	
-#else
 #endif
 
 unsigned long systemcall_table=0x0;
 module_param(systemcall_table,ulong,0660);
 int free_entries[15];
 module_param_array(free_entries,int,NULL,0660);
+
 unsigned long cr0;
+
 static inline void write_cr0_forced(unsigned long val){
     unsigned long __force_order;
 
@@ -269,6 +283,7 @@ static inline void write_cr0_forced(unsigned long val){
         "mov %0, %%cr0"
         : "+r"(val), "+m"(__force_order));
 }
+
 static inline void protect_memory(void){
     write_cr0_forced(cr0);
 }
@@ -280,6 +295,7 @@ unsigned long * nisyscall;
 int init_func(void){
     //TO-DO: da incrementare il contatore del modulo!
     //inserimento Systemcall
+    printk("size of uint64_t %d",sizeof(uint64_t));
     if(systemcall_table!=0){
         cr0 = read_cr0();
         unprotect_memory();
@@ -289,18 +305,16 @@ int init_func(void){
         sys_call_table[free_entries[1]] = (unsigned long*)sys_get_data;
         sys_call_table[free_entries[2]] = (unsigned long*)sys_invalidate_data;
         protect_memory();
-        printk("put in: %d,get  in: %d, invalide in: %d",free_entries[0],free_entries[1],free_entries[2]);
-	    printk("%s: a sys_call with 2 parameters has been installed as a trial on the sys_call_table at displacement\n",MOD_NAME);	
+        printk("put in: %d, get  in: %d, invalide in: %d\n",free_entries[0],free_entries[1],free_entries[2]);
     }
     int  ret=register_filesystem(&myFileSystemType);
     printk("il valore della macro é %d\n",NBLOCK);
     if (likely(ret==0))
-        printk("file system inserito con successo\n");
+        printk("modulo inserito con successo\n");
     else   
         printk("errore nel montaggio del file system %d\n",ret);
     return ret;
 }
-
 void cleanup_func(void){
     cr0 = read_cr0();
     unprotect_memory();
@@ -312,9 +326,9 @@ void cleanup_func(void){
     printk("Systemcall eliminate\n");    
     int  ret=unregister_filesystem(&myFileSystemType);
     if (likely(ret==0))
-        printk("file system smontato con successo\n");
+        printk("modulo smontato con successo\n");
     else    
-        printk("errore nel montaggio del file system %d\n",ret);
+        printk("errore nello smontaggio del modulo %d\n",ret);
     return;
 }
 
