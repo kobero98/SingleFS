@@ -8,6 +8,12 @@
 #define SYNCRONUS if(1)
 #endif
 
+#ifdef DEBUG
+#define DEBUG if(1)
+#else
+#define DEBUG if(0)
+#endif
+
 #define MOD_NAME "modulo_File_System"
 #define DEFAULT_BLOCK_SIZE 4096
 #define UNIQUE_FILE_NAME "the-file"

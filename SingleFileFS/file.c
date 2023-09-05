@@ -8,20 +8,26 @@
 #include "SingleFileSystem.h"
 
 ssize_t myfileops_read(struct file * filp, char __user * buf, size_t len, loff_t * off){  
-    if(len<0) return -EINVAL;
-    int ret=0;
+    int ret,x;
     struct buffer_head *bh;
     block_file_struct * block;
     metadati_block_element * p;
     myfiledata_struct* s;
-    char * strcapo ="\n";
+    atomic_register *info;
+    registro_atomico* reg;
+    char * strcapo,* string_to_pass;
+    uint64_t startTime, readerTime;
+    struct super_block * sb;
+    if(len<0) return -EINVAL;
+    strcapo ="\n";
+    ret=0;
     s = (myfiledata_struct*)filp->private_data;
-    uint64_t startTime = s->time;
-    uint64_t readerTime=getTime();
-    char * string_to_pass = kmalloc(len,0);//GFP_KERNEL
-    struct super_block * sb = filp->f_inode->i_sb;
-    atomic_register *info =(atomic_register*) sb->s_fs_info;
-    registro_atomico* reg=info->reg;
+    startTime = s->time;
+    readerTime=getTime();
+    string_to_pass = kmalloc(len,0);//GFP_KERNEL
+    sb = filp->f_inode->i_sb;
+    info =(atomic_register*) sb->s_fs_info;
+    reg=info->reg;
     __sync_fetch_and_add(&(reg->num_entry),1);
     if(info->testa == NULL)
     { 
@@ -49,19 +55,20 @@ ssize_t myfileops_read(struct file * filp, char __user * buf, size_t len, loff_t
         p=p->next;
     }while(p != NULL); //per ora scorriamo tutta la lista
     __sync_fetch_and_add(&(reg->num_exit),1);
-    int x=0;
+    x=0;
     if(ret!=0) 
         x=copy_to_user(buf,string_to_pass,ret);
     kfree(string_to_pass);
     return ret-x;
 }
 int myfileops_open(struct inode * inode, struct file * file){
+    int error;
     myfiledata_struct * fdata=(myfiledata_struct*) kzalloc(sizeof(myfiledata_struct),0);
     if(fdata == NULL){
         return -ENOMEM;
     }
     fdata->time=0;
-    int error = stream_open(inode,file);
+    error = stream_open(inode,file);
     file->private_data=(void*) fdata;
     return error; 
 }
@@ -71,10 +78,13 @@ int myfileops_release(struct inode * inode, struct file * file){
 }
 struct dentry *onefilefs_lookup(struct inode *parent_inode, struct dentry *child_dentry, unsigned int flags) {
     struct_MyInode *FS_specific_inode;
-    struct super_block *sb = parent_inode->i_sb;
-    struct buffer_head *bh = NULL;
-    struct inode *the_inode = NULL;
+    struct super_block *sb;
+    struct buffer_head *bh;
+    struct inode *the_inode;
 
+    sb = parent_inode->i_sb;
+    bh=NULL;
+    the_inode=NULL;
     if(!strcmp(child_dentry->d_name.name, UNIQUE_FILE_NAME)){
 	//get a locked inode from the cache 
         the_inode = iget_locked(sb, 1);

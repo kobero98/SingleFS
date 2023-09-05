@@ -24,9 +24,7 @@ static int countFSmount = 0;
 //driver da implementare!
 static struct super_operations myFileSystem_super_ops = {};
 static struct dentry_operations myFileSystem_dentry_ops={};
-static struct inode_operations myFileSystem_inode_ops = {};
-static struct file_operations myFileSystem_file_ops = {};
-static struct file_operations myFileSystem_dir_ops = {};
+
 
 void inserimento_incoda(metadati_block_element * );
 void init_metadata(struct super_block *,struct_sb_information* );
@@ -34,7 +32,7 @@ int trovaBit(void);
 void printBitMask(void);
 
 void printBitMask(void){
-    printk("Dim BitMask: %d\n",DIMENSIONEBITMASK);
+    printk("Dim BitMask: %ld\n",DIMENSIONEBITMASK);
     for(int i=0;i<DIMENSIONEBITMASK;i++) printk("Bitmask: %lld\n",info->bitmask[i]);
 }
 void inserimento_incoda(metadati_block_element* elemento){
@@ -51,14 +49,14 @@ void inserimento_incoda(metadati_block_element* elemento){
 void setBitUP(int index){
     int i= index/64;
     __sync_fetch_and_or(&(info->bitmask[i]),(1 << (index%64)));    
-    printBitMask();
+    DEBUG printBitMask();
 }
 //imposta un bit a 0 della bit mask corrispondente
 void setBitDown(int index){
     int i= index/64;
     uint64_t x = ~(1 << (index%64));
     __sync_fetch_and_and(&(info->bitmask[i]),x);
-    printBitMask();
+    DEBUG printBitMask();
 }
 //verifica il valore del bit del blocco
 //torna 1 se nella bitmask il bit index é 1
@@ -72,9 +70,9 @@ int checkBit(int index){
 }
 //trova un blocco con bit pari a 0
 int trovaBit(){
-    printBitMask();
-    int i;
-    int index=-1;
+    int i,index;
+    index=-1;
+    DEBUG printBitMask();
     for(i=0;i<NBLOCK;i++){
         if(!checkBit(i)){
             index=i;
@@ -84,7 +82,12 @@ int trovaBit(){
     return index;
 }
 void init_metadata(struct super_block * sb,struct_sb_information * mysb){
-    int j;
+    int j,h;
+    posizione i;
+    struct buffer_head * bh [mysb->nBlockMetadata];
+    struct_sb_metadata * sbdata[mysb->nBlockMetadata];
+    registro_atomico* reg;
+
     testa=NULL;
     coda=testa;
     info = kmalloc(sizeof(atomic_register),GFP_KERNEL);
@@ -93,15 +96,14 @@ void init_metadata(struct super_block * sb,struct_sb_information * mysb){
     }
     //TO-DO: da inserire l'inserimento iniziale dei blocchi!
     //leggo i vari blocchi di metadati
-    struct buffer_head * bh [mysb->nBlockMetadata];
-    struct_sb_metadata * sbdata[mysb->nBlockMetadata];
     for(j=0;j<mysb->nBlockMetadata;j++){
         bh[j]=sb_bread(sb,j+1);
         sbdata[j]=(struct_sb_metadata *)bh[j]->b_data;
     }
-    posizione i = mysb->first;
-    while(i.offset>=0){
-        printk("indice %d, sb_i %d, NUm %d\n",i.offset,i.sb,mysb->nBlockMetadata);
+    i = mysb->first;
+    h=0;
+    while(i.offset>=0 && h<NBLOCK ){
+        DEBUG printk("indice %d, sb_i %d, Num %lld\n",i.offset,i.sb,mysb->nBlockMetadata);
         if(sbdata[i.sb]->vet[i.offset].valid==1){
             metadati_block_element* e=(metadati_block_element*)kmalloc(sizeof(metadati_block_element),GFP_KERNEL);
             e->block.index_block=i.offset+i.sb*DIMENSIONEVETTORE;
@@ -111,13 +113,14 @@ void init_metadata(struct super_block * sb,struct_sb_information * mysb){
             inserimento_incoda(e);
         }
         i=sbdata[i.sb]->vet[i.offset].succ;
+        h++;
     }
-    printk("exit from cicle\n");
+    DEBUG printk("h=%d",h);
     //qui rilascio i superblochi ma forse non serve
     for(j=0;j<mysb->nBlockMetadata;j++){
         brelse(bh[j]);
     }
-    registro_atomico* reg=(registro_atomico*)kmalloc(sizeof(registro_atomico),GFP_KERNEL);
+    reg=(registro_atomico*)kmalloc(sizeof(registro_atomico),GFP_KERNEL);
     reg->num_entry=0;
     reg->num_exit=0;
     info->reg=reg;
@@ -131,11 +134,11 @@ void init_metadata(struct super_block * sb,struct_sb_information * mysb){
 int myFileSystem_fill_sb(struct super_block *sb,void*data,int silent){
     struct inode *root_inode;
     struct buffer_head *bh;  
-    struct buffer_head * b;
     struct_sb_information *mysb;
     struct timespec64 curr_time;
     uint64_t magic;
     uint64_t nblock;
+
     sb->s_magic= MAGICNUMBER;
     bh = sb_bread(sb,0); //sostituire 0 con una macro lo 0 indica dove sta posizionato il super block 
     //qui forse ci sta un errore
@@ -158,8 +161,6 @@ int myFileSystem_fill_sb(struct super_block *sb,void*data,int silent){
     // FANFA: dalla 6.3 prendi mnt_idmap; dalla 5.12 alla 6.2 prendi user_namespace; prima di 5.12 il parametro manca
     inode_init_owner(&nop_mnt_idmap,root_inode, NULL, S_IFDIR);
     root_inode->i_sb = sb;
-    //root_inode->i_op = &myFileSystem_inode_ops;//&onefilefs_inode_ops;     
-    //root_inode->i_fop = &myFileSystem_dir_ops; //&onefilefs_dir_operations; credo che qui il prof possa essersi sbagliato
     root_inode->i_op = &onefilefs_inode_ops;
     root_inode->i_fop = &onefilefs_dir_operations;
     root_inode ->i_mode = S_IFDIR | S_IRUSR | S_IRGRP | S_IROTH | S_IWUSR | S_IWGRP | S_IXUSR | S_IXGRP |  S_IXOTH;
@@ -173,38 +174,42 @@ int myFileSystem_fill_sb(struct super_block *sb,void*data,int silent){
     unlock_new_inode(root_inode);
     init_metadata(sb,mysb);
     the_sb = sb; //mi salvo il superblocco per passarlo alle systemcall, posso salvarmi qualcosa di più piccolo! 
-    printk("mount avvenuta con successo\n");
+    printk("moduloFS: Mount avvenuta con successo\n");
     return 0;
 }
+
 //funzione per il montaggio del filesystem
 struct dentry * myFileSystem_mount(struct file_system_type * type, int flags, const char *dev_name,void *data){
+    struct dentry * ret;
     if(!__sync_bool_compare_and_swap(&countFSmount,0,1)){
-        printk("non é possibile montare il file system\n");
+        printk("moduloFS: non é possibile montare il file system\n");
         return ERR_PTR(-EIO);
     }
-    struct dentry * ret =  mount_bdev(type,flags,dev_name,data,myFileSystem_fill_sb); //forse bisogna utilizzare mount_nodev poi studio meglio.
+    ret =  mount_bdev(type,flags,dev_name,data,myFileSystem_fill_sb); //forse bisogna utilizzare mount_nodev poi studio meglio.
     if (unlikely(IS_ERR(ret)))
-        printk("Errore durante il montaggio del filesystem");
+        printk("moduloFS-Errore: Durante il montaggio del filesystem");
     else
-        printk("montaggio avvenuto con successo");
+        printk("moduloFS: Montaggio avvenuto con successo");
     return ret;
 }
 //funzione per lo smontaggio del filesystem
 static void myFileSystem_kill_sb(struct super_block *sb){
+    metadati_block_element *p,*q;
     if(! __sync_bool_compare_and_swap(&countFSmount,1,0)){
-        printk("file system non montato\n");
+        printk("moduloFS-Errore: File system non montato\n");
         return;
     }
-    //free list valid
-    metadati_block_element *p;
-    metadati_block_element * q = testa;
+    //free list
+    q = info->testa;
     while(q!=NULL){
         p=q->next;
         kfree(q);
         q=p;
     }
+    kfree(info->reg);
+    kfree(info);
     kill_block_super(sb);
-    printk("file system smontato\n");
+    printk("moduloFS: File system smontato\n");
     return ;
 }
 //my file system type kernel 6.3 credo vada bene devo controllare nelle versioni più aggiornate
@@ -221,14 +226,14 @@ __SYSCALL_DEFINEx(2,_put_data, char *, A, size_t, B){
 #else
 asmlinkage int sys_put_data(char* A, size_t B){
 #endif
+        int ret;
         if(!countFSmount){
-            printk("Errore: Filesystem non montato\n");
+            printk("moduloFS-Errore: Filesystem non montato\n");
             return -ENODEV;
         }
         if(B>MAXBLOCKDATA || B<=0){
             return -EINVAL;
         }
-        int ret;
         ret=put_data(A,B);
         return ret;
 }
@@ -238,14 +243,14 @@ __SYSCALL_DEFINEx(3,_get_data,int, A ,char *, B, size_t, C){
 #else
 asmlinkage int sys_get_data(int A, char* B, size_t C){
 #endif
+        int ret;
         if(!countFSmount){
-            printk("Errore: Filesystem non montato\n");
+            printk("moduloFS-Errore: Filesystem non montato\n");
             return -ENODEV;
         }
         if(A<0 || A>=NBLOCK){
             return -EINVAL;
         }
-        int ret;
         ret=get_data(A,B,C);
         return ret;
 }
@@ -254,11 +259,11 @@ __SYSCALL_DEFINEx(1,_invalidate_data, int, A){
 #else
 asmlinkage int sys_invalidate_data(int A){
 #endif
+        int ret;
         if(!countFSmount){
-            printk("Errore: Filesystem non montato\n");
+            printk("moduloFS-Errore: Filesystem non montato\n");
             return -ENODEV;
         }
-        int ret;
         ret=invalidate_data(A);
         return ret;
 }
@@ -291,44 +296,47 @@ static inline void protect_memory(void){
 static inline void unprotect_memory(void){
     write_cr0_forced(cr0 & ~X86_CR0_WP);
 }
-unsigned long * nisyscall;
+unsigned long nisyscall;
 int init_func(void){
     //TO-DO: da incrementare il contatore del modulo!
     //inserimento Systemcall
-    printk("size of uint64_t %d",sizeof(uint64_t));
+    int ret;
+    unsigned long * sys_call_table;
     if(systemcall_table!=0){
         cr0 = read_cr0();
         unprotect_memory();
-        unsigned long * sys_call_table = (void*) systemcall_table; 
+        sys_call_table = (void*) systemcall_table; 
         nisyscall = sys_call_table[free_entries[0]];
         sys_call_table[free_entries[0]] = (unsigned long*)sys_put_data;
         sys_call_table[free_entries[1]] = (unsigned long*)sys_get_data;
         sys_call_table[free_entries[2]] = (unsigned long*)sys_invalidate_data;
         protect_memory();
-        printk("put in: %d, get  in: %d, invalide in: %d\n",free_entries[0],free_entries[1],free_entries[2]);
+        printk("moduloFS: put in: %d, get  in: %d, invalide in: %d\n",free_entries[0],free_entries[1],free_entries[2]);
+    }else{
+        printk("moduloFS-Errore: systemcall Table non trovata\n");
+        return -1;
     }
-    int  ret=register_filesystem(&myFileSystemType);
-    printk("il valore della macro é %d\n",NBLOCK);
+    ret=register_filesystem(&myFileSystemType);
     if (likely(ret==0))
-        printk("modulo inserito con successo\n");
+        printk("moduloFS:modulo inserito con successo\n");
     else   
-        printk("errore nel montaggio del file system %d\n",ret);
+        printk("moduloFS-Errore: Registrazione del File System %d\n",ret);
     return ret;
 }
 void cleanup_func(void){
+    int  ret;
     cr0 = read_cr0();
     unprotect_memory();
     unsigned long * sys_call_table = (void*) systemcall_table; 
     sys_call_table[free_entries[0]] = nisyscall;
     sys_call_table[free_entries[1]] = nisyscall;
     sys_call_table[free_entries[2]] = nisyscall;
-    protect_memory();
-    printk("Systemcall eliminate\n");    
-    int  ret=unregister_filesystem(&myFileSystemType);
+    protect_memory();  
+    ret=unregister_filesystem(&myFileSystemType);
     if (likely(ret==0))
-        printk("modulo smontato con successo\n");
+        printk("moduloFS: modulo smontato con successo\n");
     else    
-        printk("errore nello smontaggio del modulo %d\n",ret);
+        printk("moduloFS-Errore: de-registrazione del FS %d\n",ret);
     return;
 }
 

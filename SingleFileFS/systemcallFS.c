@@ -12,23 +12,25 @@ int confronto_posizioni(posizione i,posizione j){
    return i.sb==j.sb && i.offset==j.offset;
 }
 void update_memory_struct(int index){
-    posizione mypos;
-    index_to_posizione(&mypos,index);
-    struct buffer_head * bh_meta = sb_bread(the_sb,0);
-    struct_sb_information * sb_meta = (struct_sb_information *) bh_meta->b_data;
-    posizione last = sb_meta->last;
-    posizione first = sb_meta->first;
-
+    posizione mypos,last,first,prec,succ;
+    struct buffer_head * bh_meta;
     struct buffer_head * bh[2];
     struct_sb_metadata * metadata_block[5];
+    struct_sb_information * sb_meta;
+
+    index_to_posizione(&mypos,index);
+    bh_meta = sb_bread(the_sb,0);
+    sb_meta = (struct_sb_information *) bh_meta->b_data;
+    last = sb_meta->last;
+    first = sb_meta->first;
 
     bh[0]=sb_bread(the_sb,mypos.sb+1);
     metadata_block[0]=(struct_sb_metadata*) bh[0]->b_data;
     
     //valido il bit
     metadata_block[0]->vet[mypos.offset].valid=1;
-    posizione prec = metadata_block[0]->vet[mypos.offset].prec;
-    posizione succ = metadata_block[0]->vet[mypos.offset].succ;
+    prec = metadata_block[0]->vet[mypos.offset].prec;
+    succ = metadata_block[0]->vet[mypos.offset].succ;
     //in caso il file system sia nuovo
     if( last.offset == -1){
         sb_meta->last.offset=mypos.offset;
@@ -51,7 +53,7 @@ void update_memory_struct(int index){
         brelse(bh_meta);
         return;
     }
-    //in caso sia ("già l'ultimo ad essere inserito
+    //in caso sia ("già l'ultimo ad essere inserito")
     if(confronto_posizioni(mypos,last)) {
         mark_buffer_dirty(bh[0]);
         SYNCRONUS sync_dirty_buffer(bh[0]);
@@ -79,6 +81,7 @@ void update_memory_struct(int index){
         }
         metadata_block[0]->vet[mypos.offset].succ.offset=-1;
     }
+
     if(confronto_posizioni(succ,prec) != 1){
         //modifico il successore
         if(mypos.sb == succ.sb){
@@ -94,18 +97,17 @@ void update_memory_struct(int index){
             brelse(bh[1]);
         }
         if(prec.sb == mypos.sb){
-            metadata_block[0]->vet[prec.offset].prec.offset=succ.offset;
-            metadata_block[0]->vet[prec.offset].prec.sb=succ.sb;
+            metadata_block[0]->vet[prec.offset].succ.offset=succ.offset;
+            metadata_block[0]->vet[prec.offset].succ.sb=succ.sb;
         }else{
             bh[1]=sb_bread(the_sb,prec.sb+1);
             metadata_block[1]=(struct_sb_metadata*) bh[1]->b_data;          
-            metadata_block[1]->vet[succ.offset].prec.offset=succ.offset;
-            metadata_block[1]->vet[succ.offset].prec.sb=succ.sb;
+            metadata_block[1]->vet[prec.offset].succ.offset=succ.offset;
+            metadata_block[1]->vet[prec.offset].succ.sb=succ.sb;
             mark_buffer_dirty(bh[1]);
             SYNCRONUS sync_dirty_buffer(bh[1]);
             brelse(bh[1]);
         }
-        
         metadata_block[0]->vet[mypos.offset].succ.offset=-1;
         metadata_block[0]->vet[mypos.offset].succ.sb=-1;
         metadata_block[0]->vet[mypos.offset].prec.offset=-1;
@@ -152,11 +154,16 @@ uint64_t getTime(void){
 int put_data(char * source,size_t size){
     bool compare;
     size_t ret;
+    int index,diff,mask;
+    struct buffer_head * bh;
+    atomic_register *info;
+    metadati_block_element * q;
+    block_file_struct* block;
     //Dovrei effettuare lo scollegamento del blocco
     //forse non dovrei caricare tutto in memoria!
-    metadati_block_element * q= kmalloc(sizeof(metadati_block_element),GFP_KERNEL);
+    q= kmalloc(sizeof(metadati_block_element),GFP_KERNEL);
     q->next=NULL;
-    atomic_register *info =(atomic_register*) the_sb->s_fs_info;
+    info =(atomic_register*) the_sb->s_fs_info;
     TakeTicket:    
     compare = __sync_bool_compare_and_swap(&(info->lockScrittore),0,1);
     if(compare == false){
@@ -164,9 +171,9 @@ int put_data(char * source,size_t size){
         goto TakeTicket;
     }
     //inizio sezione con lock
-    int index = trovaBit();
+    index = trovaBit();
     if(index==-1){
-        printk("Non ci sono bit per la Put\n");
+        DEBUG printk("modulefs-put: Non ci sono bit per la Put\n");
         kfree(q);
         __sync_fetch_and_sub(&(info->lockScrittore),1);
         return -ENOMEM;
@@ -176,16 +183,13 @@ int put_data(char * source,size_t size){
     q->next=NULL;
     /* modifico il blocco di dati */
     //codice di sanitizzazione
-    int diff=MAXBLOCKDATA-size;
-    int mask=diff>>(sizeof(int)*8-1);
-    printk("size: %d MAXBLOCKDATA: %d\n",size,MAXBLOCKDATA);
-    size=(MAXBLOCKDATA & mask) | (size & ~mask);
-    printk("taglia: %d\n",size);
-    struct buffer_head * bh=sb_bread(the_sb,index+NUMEROMETADATABLOCK+2);
-    block_file_struct* block=(block_file_struct*) bh->b_data;
+    diff=MAXBLOCKDATA-size;
+    mask=diff>>(sizeof(int)*8-1);
+    size=(MAXBLOCKDATA & mask) | (size & (~mask));
+    bh=sb_bread(the_sb,index+NUMEROMETADATABLOCK+2);
+    block=(block_file_struct*) bh->b_data;
     ret = copy_from_user(block->dati,source,size);
     block->size=size-ret;
-    printk("block size: %d\n",block->size);
     mark_buffer_dirty(bh);
     //TO-DO:aggiungere la SYNC
     SYNCRONUS sync_dirty_buffer(bh);
@@ -202,32 +206,43 @@ int put_data(char * source,size_t size){
 }
 int get_data(int offset,char * destination,size_t size){
     size_t ret;
+    struct buffer_head * bh;
+    int diff,mask;
+    block_file_struct* block;
+
     if(!checkBit(offset)){
         //non so se questo controllo potrebbe dare falsi negativi(?)
         return -ENODATA;
     }
-    struct buffer_head * bh=sb_bread(the_sb,offset+NUMEROMETADATABLOCK+2);
+    bh=sb_bread(the_sb,offset+NUMEROMETADATABLOCK+2);
     if(bh==NULL){
         //errore
         return -EIO;
     }
-    block_file_struct* block=(block_file_struct*) bh->b_data;
-    int diff = size - (block->size);
-    int mask=diff>>(sizeof(int)*8-1);
+    block=(block_file_struct*) bh->b_data;
+    diff = size - (block->size);
+    mask=diff>>(sizeof(int)*8-1);
     size=(size & mask) | (block->size & ~mask);
     ret = copy_to_user(destination,block->dati,size);
     return size-ret;
 }
 int invalidate_data(int offset){
+    posizione mypos;
+    atomic_register *info;
+    struct buffer_head * bh;
+    struct_sb_metadata* metadati_block;
+    registro_atomico *newReg;
+    bool compare;
+    metadati_block_element *q,*p;
+    registro_atomico * oldReg;
     if(!checkBit(offset)){
-        printk("offset non occuppato\n");
+        DEBUG printk("modulefs-invalide: offset non occuppato\n");
         return -ENODATA;
     }
-    posizione mypos;
     index_to_posizione(&mypos,offset);
-    atomic_register *info =(atomic_register*) the_sb->s_fs_info;
+    info =(atomic_register*) the_sb->s_fs_info;
     TakeTicketInvalid:    
-    bool compare = __sync_bool_compare_and_swap(&(info->lockScrittore),0,1);
+    compare = __sync_bool_compare_and_swap(&(info->lockScrittore),0,1);
     if(compare == false){
         msleep(2);
         goto TakeTicketInvalid;
@@ -235,22 +250,20 @@ int invalidate_data(int offset){
     //da qui la get non può più vedere il dato aggiornato
     setBitDown(offset);
     //aggiorno i metadati dei superblocchi
-    struct buffer_head * bh=sb_bread(the_sb,mypos.sb+1);
-    struct_sb_metadata* metadati_block =(struct_sb_metadata*) bh->b_data;
+    bh=sb_bread(the_sb,mypos.sb+1);
+    metadati_block =(struct_sb_metadata*) bh->b_data;
     metadati_block->vet[mypos.offset].valid=0;
     mark_buffer_dirty(bh);
     SYNCRONUS sync_dirty_buffer(bh);
     brelse(bh);
-
-    registro_atomico *newReg =(registro_atomico *) kmalloc(sizeof(registro_atomico),GFP_KERNEL);
+    newReg =(registro_atomico *) kmalloc(sizeof(registro_atomico),GFP_KERNEL);
     newReg->num_entry=0;
     newReg->num_exit=0;
-    metadati_block_element *p=NULL;
-    metadati_block_element * q=info->testa;
+    p=NULL;
+    q=info->testa;
     if(info->testa->block.index_block==offset){
         __sync_bool_compare_and_swap(&(info->coda),info->testa,p);
         __atomic_exchange_n(&(info->testa),info->testa->next,__ATOMIC_SEQ_CST);     
-        registro_atomico * oldReg;
         __atomic_exchange_n(&(oldReg),info->reg,0);
         __atomic_exchange_n(&(info->reg),newReg,0);//aspetta che sono usciti tutti quelli che leggono
         while(oldReg->num_entry != oldReg->num_exit)
