@@ -12,7 +12,7 @@ int main(int argc,char * argv[]){
     if(x==0 && errno!=0 ){
         printf("Valore non valido\n");
         printf("Eseguire ./invalide [index] ");
-        printf("dove index é un numero");
+        printf("dove index é un numero\n");
         return 0;
     }
     int z=syscall(INVALIDATE,x);
