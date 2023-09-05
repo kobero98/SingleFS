@@ -25,5 +25,10 @@ mount-fs:
 umount-fs:
 	sudo umount PointMount
 create-user:
-	gcc user/main.c -o user/a.out
+	gcc user/client.c -o user/client
+	gcc user/put.c -o user/put
+	gcc user/get.c -o user/get
+	gcc user/invalide.c -o user/invalide
+	gcc user/test.c -o user/test -pthread
+
 

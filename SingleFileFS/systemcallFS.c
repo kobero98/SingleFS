@@ -173,7 +173,7 @@ int put_data(char * source,size_t size){
     //inizio sezione con lock
     index = trovaBit();
     if(index==-1){
-        DEBUG printk("modulefs-put: Non ci sono bit per la Put\n");
+        AUDIT printk("modulefs-put: Non ci sono bit per la Put\n");
         kfree(q);
         __sync_fetch_and_sub(&(info->lockScrittore),1);
         return -ENOMEM;
@@ -185,13 +185,12 @@ int put_data(char * source,size_t size){
     //codice di sanitizzazione
     diff=MAXBLOCKDATA-size;
     mask=diff>>(sizeof(int)*8-1);
-    size=(MAXBLOCKDATA & mask) | (size & (~mask));
+    size=((MAXBLOCKDATA) & (mask)) | ((size) & (~mask));
     bh=sb_bread(the_sb,index+NUMEROMETADATABLOCK+2);
     block=(block_file_struct*) bh->b_data;
     ret = copy_from_user(block->dati,source,size);
     block->size=size-ret;
     mark_buffer_dirty(bh);
-    //TO-DO:aggiungere la SYNC
     SYNCRONUS sync_dirty_buffer(bh);
     /* Modifico i metadati associati al file system*/
     update_memory_struct(index);
@@ -235,8 +234,9 @@ int invalidate_data(int offset){
     bool compare;
     metadati_block_element *q,*p;
     registro_atomico * oldReg;
+
     if(!checkBit(offset)){
-        DEBUG printk("modulefs-invalide: offset non occuppato\n");
+        AUDIT printk("modulefs-invalide: offset non occuppato\n");
         return -ENODATA;
     }
     index_to_posizione(&mypos,offset);
@@ -264,8 +264,8 @@ int invalidate_data(int offset){
     if(info->testa->block.index_block==offset){
         __sync_bool_compare_and_swap(&(info->coda),info->testa,p);
         __atomic_exchange_n(&(info->testa),info->testa->next,__ATOMIC_SEQ_CST);     
-        __atomic_exchange_n(&(oldReg),info->reg,0);
-        __atomic_exchange_n(&(info->reg),newReg,0);//aspetta che sono usciti tutti quelli che leggono
+        __atomic_exchange_n(&(oldReg),info->reg,__ATOMIC_SEQ_CST);
+        __atomic_exchange_n(&(info->reg),newReg,__ATOMIC_SEQ_CST);//aspetta che sono usciti tutti quelli che leggono
         while(oldReg->num_entry != oldReg->num_exit)
         {
             msleep(1);//in caso che devo attendere rilascio la cpu
@@ -279,9 +279,8 @@ int invalidate_data(int offset){
             if(q->block.index_block==offset){
                 __sync_bool_compare_and_swap(&(info->coda),q,p);
                 __sync_bool_compare_and_swap(&(p->next),q,q->next);
-                registro_atomico * oldReg;
-                __atomic_exchange_n(&(oldReg),info->reg,0);
-                __atomic_exchange_n(&(info->reg),newReg,0);
+                __atomic_exchange_n(&(oldReg),info->reg,__ATOMIC_SEQ_CST);
+                __atomic_exchange_n(&(info->reg),newReg,__ATOMIC_SEQ_CST);
                 //aspetta che sono usciti tutti quelli che leggono
                 //mi salvo quanti sono dentro potrebe essere un numero più grande di quello che realmente dovevo aspettare
                 while(oldReg->num_entry != oldReg->num_exit){

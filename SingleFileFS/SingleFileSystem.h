@@ -2,16 +2,16 @@
 #include <linux/fs.h>
 #include "Create_FS.h"
 
-#ifndef SYNCRONUS
+#ifndef SYNC
 #define SYNCRONUS if(0)
 #else
 #define SYNCRONUS if(1)
 #endif
 
 #ifdef DEBUG
-#define DEBUG if(1)
+#define AUDIT if(1)
 #else
-#define DEBUG if(0)
+#define AUDIT if(0)
 #endif
 
 #define MOD_NAME "modulo_File_System"
@@ -22,7 +22,7 @@
 #define SINGLEFILEFS_FILE_INODE_NUMBER 1
 #define SINGLEFILEFS_ROOT_INODE_NUMBER 10
 #define SINGLEFILEFS_INODES_BLOCK_NUMBER 1
-#define DIMENSIONEBITMASK NBLOCK/(sizeof(uint64_t)*8) + 1*((NBLOCK % 64)!=0)
+#define DIMENSIONEBITMASK (NBLOCK/(sizeof(uint64_t)*8) + 1*((NBLOCK % 64)!=0))
 
 
 typedef struct metadati_block{

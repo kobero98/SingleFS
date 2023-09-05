@@ -11,12 +11,11 @@
 #define PUT 134
 #define GET 156
 #define INVALIDATE 174
-
-
+#define N 400
 
 void *ThreadRead(void * param){
     int j=0;
-    while(j<10){    
+    while(j<N){    
         int fd = open("../PointMount/the-file",O_RDONLY);
         int x;
         do{
@@ -29,10 +28,9 @@ void *ThreadRead(void * param){
     };
     return NULL;
 }
-
 void *ThreadGet(void * param){
     int j=0;
-    while(j<10){    
+    while(j<N){    
         int index=rand() % 100;
         char buf[4096];
         int ret=syscall(GET,index,buf,strlen(buf));
@@ -41,10 +39,9 @@ void *ThreadGet(void * param){
     };
     return NULL;
 }
-
 void *ThreadPut(void * param){
     int j=0;
-    while(j<10){    
+    while(j<N){    
         int index=rand() % 1000;
         char frase[4096];
         sprintf(frase,"%d sotto la panca la capra panca",index);
@@ -54,10 +51,9 @@ void *ThreadPut(void * param){
     };
     return NULL;
 }
-
 void* ThreadInvalide(void * param){
     int j=0;
-    while(j<10){    
+    while(j<N){    
         int index=rand() % 100;
         int ret=syscall(INVALIDATE,index);
         printf("INVALIDATE: index=%d ret=%d\n",index,ret);
@@ -65,7 +61,6 @@ void* ThreadInvalide(void * param){
     };
     return NULL;
 }
-
 int main(){
     pthread_t tidPut[2];
     pthread_t tidGet[5];

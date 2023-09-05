@@ -21,7 +21,6 @@ static int onefilefs_iterate(struct file *file, struct dir_context* ctx) {
 		}
 	
 	}
-
 	if (ctx->pos == 1){
  		//here the inode number does not care
 		if(!dir_emit(ctx,"..", FILENAME_MAXLEN, 1, DT_UNKNOWN)){
@@ -30,7 +29,6 @@ static int onefilefs_iterate(struct file *file, struct dir_context* ctx) {
 		else{
 			ctx->pos++;
 		}
-	
 	}
 	if (ctx->pos == 2){
 		if(!dir_emit(ctx, UNIQUE_FILE_NAME, FILENAME_MAXLEN, SINGLEFILEFS_FILE_INODE_NUMBER, DT_UNKNOWN)){
@@ -41,7 +39,6 @@ static int onefilefs_iterate(struct file *file, struct dir_context* ctx) {
 		}
 	
 	}
-
 	return 0;
 
 }

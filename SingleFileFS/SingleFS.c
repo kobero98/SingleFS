@@ -49,14 +49,14 @@ void inserimento_incoda(metadati_block_element* elemento){
 void setBitUP(int index){
     int i= index/64;
     __sync_fetch_and_or(&(info->bitmask[i]),(1 << (index%64)));    
-    DEBUG printBitMask();
+    AUDIT printBitMask();
 }
 //imposta un bit a 0 della bit mask corrispondente
 void setBitDown(int index){
     int i= index/64;
     uint64_t x = ~(1 << (index%64));
     __sync_fetch_and_and(&(info->bitmask[i]),x);
-    DEBUG printBitMask();
+    AUDIT printBitMask();
 }
 //verifica il valore del bit del blocco
 //torna 1 se nella bitmask il bit index é 1
@@ -72,7 +72,7 @@ int checkBit(int index){
 int trovaBit(){
     int i,index;
     index=-1;
-    DEBUG printBitMask();
+    AUDIT printBitMask();
     for(i=0;i<NBLOCK;i++){
         if(!checkBit(i)){
             index=i;
@@ -84,17 +84,22 @@ int trovaBit(){
 void init_metadata(struct super_block * sb,struct_sb_information * mysb){
     int j,h;
     posizione i;
-    struct buffer_head * bh [mysb->nBlockMetadata];
-    struct_sb_metadata * sbdata[mysb->nBlockMetadata];
+    //struct buffer_head * bh [mysb->nBlockMetadata];
+    //struct_sb_metadata * sbdata[mysb->nBlockMetadata];
+    struct buffer_head ** bh;
+    struct_sb_metadata ** sbdata;
     registro_atomico* reg;
 
+
+    bh =(struct buffer_head **) kmalloc(sizeof(struct buffer_head *)*mysb->nBlockMetadata,GFP_KERNEL);
+    sbdata =(struct_sb_metadata **) kmalloc(sizeof(struct_sb_metadata *)*mysb->nBlockMetadata,GFP_KERNEL);
+    
     testa=NULL;
     coda=testa;
     info = kmalloc(sizeof(atomic_register),GFP_KERNEL);
     for(j=0;j<DIMENSIONEBITMASK;j++){
         info->bitmask[j]=0;
     }
-    //TO-DO: da inserire l'inserimento iniziale dei blocchi!
     //leggo i vari blocchi di metadati
     for(j=0;j<mysb->nBlockMetadata;j++){
         bh[j]=sb_bread(sb,j+1);
@@ -103,7 +108,7 @@ void init_metadata(struct super_block * sb,struct_sb_information * mysb){
     i = mysb->first;
     h=0;
     while(i.offset>=0 && h<NBLOCK ){
-        DEBUG printk("indice %d, sb_i %d, Num %lld\n",i.offset,i.sb,mysb->nBlockMetadata);
+        AUDIT printk("indice %d, sb_i %d, Num %lld\n",i.offset,i.sb,mysb->nBlockMetadata);
         if(sbdata[i.sb]->vet[i.offset].valid==1){
             metadati_block_element* e=(metadati_block_element*)kmalloc(sizeof(metadati_block_element),GFP_KERNEL);
             e->block.index_block=i.offset+i.sb*DIMENSIONEVETTORE;
@@ -115,7 +120,7 @@ void init_metadata(struct super_block * sb,struct_sb_information * mysb){
         i=sbdata[i.sb]->vet[i.offset].succ;
         h++;
     }
-    DEBUG printk("h=%d",h);
+    AUDIT printk("h=%d",h);
     //qui rilascio i superblochi ma forse non serve
     for(j=0;j<mysb->nBlockMetadata;j++){
         brelse(bh[j]);
@@ -129,6 +134,8 @@ void init_metadata(struct super_block * sb,struct_sb_information * mysb){
     info->testa=testa;
     info->coda=coda;
     sb->s_fs_info=info;
+    kfree(bh);
+    kfree(sbdata);
 }
 //funzione per il riempimento del superblocco
 int myFileSystem_fill_sb(struct super_block *sb,void*data,int silent){
@@ -159,7 +166,14 @@ int myFileSystem_fill_sb(struct super_block *sb,void*data,int silent){
     root_inode->i_ino = 10; //da sostituire con una macro 
     // questa istruzione é dipendendete dalla versione 6.3 la funzione inode_init_owner prende 4 parametri
     // FANFA: dalla 6.3 prendi mnt_idmap; dalla 5.12 alla 6.2 prendi user_namespace; prima di 5.12 il parametro manca
-    inode_init_owner(&nop_mnt_idmap,root_inode, NULL, S_IFDIR);
+    #if LINUX_VERSION_CODE <= KERNEL_VERSION(5,12,0)
+        inode_init_owner(root_inode, NULL, S_IFDIR);
+    #elif LINUX_VERSION_CODE < KERNEL_VERSION(6,3,0)
+        inode_init_owner(&init_user_ns,root_inode, NULL, S_IFDIR);
+    #elif LINUX_VERSION_CODE >= KERNEL_VERSION(6,3,0)
+        inode_init_owner(&nop_mnt_idmap,root_inode, NULL, S_IFDIR);
+    #endif
+
     root_inode->i_sb = sb;
     root_inode->i_op = &onefilefs_inode_ops;
     root_inode->i_fop = &onefilefs_dir_operations;
@@ -296,12 +310,11 @@ static inline void protect_memory(void){
 static inline void unprotect_memory(void){
     write_cr0_forced(cr0 & ~X86_CR0_WP);
 }
-unsigned long nisyscall;
+unsigned long * nisyscall;
 int init_func(void){
-    //TO-DO: da incrementare il contatore del modulo!
     //inserimento Systemcall
     int ret;
-    unsigned long * sys_call_table;
+    unsigned long ** sys_call_table;
     if(systemcall_table!=0){
         cr0 = read_cr0();
         unprotect_memory();
@@ -325,9 +338,10 @@ int init_func(void){
 }
 void cleanup_func(void){
     int  ret;
+    unsigned long ** sys_call_table;
     cr0 = read_cr0();
     unprotect_memory();
-    unsigned long * sys_call_table = (void*) systemcall_table; 
+    sys_call_table = (void*) systemcall_table; 
     sys_call_table[free_entries[0]] = nisyscall;
     sys_call_table[free_entries[1]] = nisyscall;
     sys_call_table[free_entries[2]] = nisyscall;
