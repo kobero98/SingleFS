@@ -1,5 +1,6 @@
 #include <linux/init.h>
 #include <linux/module.h>
+#include <linux/version.h>
 #include <linux/fs.h>
 #include <linux/buffer_head.h>
 #include <linux/types.h>
@@ -96,11 +97,11 @@ struct dentry *onefilefs_lookup(struct inode *parent_inode, struct dentry *child
 	}
 	//this work is done if the inode was not already cached
     #if LINUX_VERSION_CODE <= KERNEL_VERSION(5,12,0)
-        inode_init_owner(root_inode, NULL, S_IFDIR);
+        inode_init_owner(the_inode, NULL, S_IFDIR);
     #elif LINUX_VERSION_CODE < KERNEL_VERSION(6,3,0)
-        inode_init_owner(&init_user_ns,root_inode, NULL, S_IFDIR);
+        inode_init_owner(&init_user_ns,the_inode, NULL, S_IFDIR);
     #elif LINUX_VERSION_CODE >= KERNEL_VERSION(6,3,0)
-        inode_init_owner(&nop_mnt_idmap,root_inode, NULL, S_IFDIR);
+        inode_init_owner(&nop_mnt_idmap,the_inode, NULL, S_IFDIR);
     #endif
 	the_inode->i_mode = S_IFREG | S_IRUSR | S_IRGRP | S_IROTH | S_IWUSR | S_IWGRP | S_IXUSR | S_IXGRP | S_IXOTH;
         the_inode->i_fop = &onefilefs_file_operations;
