@@ -22,7 +22,8 @@
 #define SINGLEFILEFS_FILE_INODE_NUMBER 1
 #define SINGLEFILEFS_ROOT_INODE_NUMBER 10
 #define SINGLEFILEFS_INODES_BLOCK_NUMBER 1
-#define DIMENSIONEBITMASK (NBLOCK/(sizeof(uint64_t)*8) + 1*((NBLOCK % 64)!=0))
+#define DIMENSIONE_ELEMENTO_BITMASK (sizeof(int)*8)
+#define DIMENSIONEBITMASK (NBLOCK/DIMENSIONE_ELEMENTO_BITMASK + 1*((NBLOCK % DIMENSIONE_ELEMENTO_BITMASK)!=0))
 
 
 typedef struct metadati_block{
@@ -44,7 +45,7 @@ typedef struct atomic_register{
     registro_atomico * reg;
     int lockScrittore;
     int lockInvalid;
-    uint64_t bitmask[DIMENSIONEBITMASK];
+    int bitmask[DIMENSIONEBITMASK];
     metadati_block_element * testa;
     metadati_block_element * coda;
 }atomic_register;

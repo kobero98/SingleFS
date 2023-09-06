@@ -7,6 +7,7 @@
 #include <linux/slab.h>
 #include <linux/string.h>
 #include "SingleFileSystem.h"
+#include <linux/delay.h>
 
 ssize_t myfileops_read(struct file * filp, char __user * buf, size_t len, loff_t * off){  
     int ret,x;
@@ -36,7 +37,7 @@ ssize_t myfileops_read(struct file * filp, char __user * buf, size_t len, loff_t
         __sync_fetch_and_add(&(reg->num_exit),1);
         return -ENODATA;
     }
-    p=info->testa;
+    __atomic_store_n(&(p),info->testa,__ATOMIC_SEQ_CST);
     do{
         if(checkBit(p->block.index_block)){
             if(p->block.time>startTime && p->block.time<=readerTime){
@@ -53,7 +54,7 @@ ssize_t myfileops_read(struct file * filp, char __user * buf, size_t len, loff_t
                 brelse(bh);
             }
         }
-        p=p->next;
+        __atomic_store_n(&(p),p->next,__ATOMIC_SEQ_CST);
     }while(p != NULL); //per ora scorriamo tutta la lista
     __sync_fetch_and_add(&(reg->num_exit),1);
     x=0;
@@ -62,6 +63,7 @@ ssize_t myfileops_read(struct file * filp, char __user * buf, size_t len, loff_t
     kfree(string_to_pass);
     return ret-x;
 }
+
 int myfileops_open(struct inode * inode, struct file * file){
     int error;
     myfiledata_struct * fdata=(myfiledata_struct*) kzalloc(sizeof(myfiledata_struct),0);

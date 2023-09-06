@@ -33,7 +33,7 @@ void printBitMask(void);
 
 void printBitMask(void){
     printk("Dim BitMask: %ld\n",DIMENSIONEBITMASK);
-    for(int i=0;i<DIMENSIONEBITMASK;i++) printk("Bitmask: %lld\n",info->bitmask[i]);
+    for(int i=0;i<DIMENSIONEBITMASK;i++) printk("Bitmask: %d\n",info->bitmask[i]);
 }
 void inserimento_incoda(metadati_block_element* elemento){
     if(likely(testa != NULL)){
@@ -47,14 +47,14 @@ void inserimento_incoda(metadati_block_element* elemento){
 
 //imposta un bit a 1 della bit mask corrispondente
 void setBitUP(int index){
-    int i= index/64;
-    __sync_fetch_and_or(&(info->bitmask[i]),(1 << (index%64)));    
+    int i= index/DIMENSIONE_ELEMENTO_BITMASK;
+    __sync_fetch_and_or(&(info->bitmask[i]),(1 << (index%DIMENSIONE_ELEMENTO_BITMASK)));    
     AUDIT printBitMask();
 }
 //imposta un bit a 0 della bit mask corrispondente
 void setBitDown(int index){
-    int i= index/64;
-    uint64_t x = ~(1 << (index%64));
+    int i= index/DIMENSIONE_ELEMENTO_BITMASK;
+    uint64_t x = ~(1 << (index%DIMENSIONE_ELEMENTO_BITMASK));
     __sync_fetch_and_and(&(info->bitmask[i]),x);
     AUDIT printBitMask();
 }
@@ -64,8 +64,8 @@ void setBitDown(int index){
 int checkBit(int index){
     int i;
     uint64_t pos;
-    i=index/64;
-    pos = 1 << (index%64);
+    i=index/DIMENSIONE_ELEMENTO_BITMASK;
+    pos = 1 << (index%DIMENSIONE_ELEMENTO_BITMASK);
     return (info->bitmask[i] & pos) == pos;
 }
 //trova un blocco con bit pari a 0
@@ -248,7 +248,9 @@ asmlinkage int sys_put_data(char* A, size_t B){
         if(B>MAXBLOCKDATA || B<=0){
             return -EINVAL;
         }
+        AUDIT printk("moduloFS: Put\n");
         ret=put_data(A,B);
+        AUDIT printk("moduloFS: END Put\n");
         return ret;
 }
 
@@ -265,7 +267,9 @@ asmlinkage int sys_get_data(int A, char* B, size_t C){
         if(A<0 || A>=NBLOCK){
             return -EINVAL;
         }
+        AUDIT printk("moduloFS: Get\n");
         ret=get_data(A,B,C);
+        AUDIT printk("moduloFS: End Get\n");
         return ret;
 }
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4,17,0)
@@ -278,7 +282,9 @@ asmlinkage int sys_invalidate_data(int A){
             printk("moduloFS-Errore: Filesystem non montato\n");
             return -ENODEV;
         }
+        AUDIT printk("moduloFS: Invalide\n");
         ret=invalidate_data(A);
+        AUDIT printk("moduloFS: End Invalide\n");
         return ret;
 }
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4,17,0)
