@@ -18,6 +18,6 @@ int main(int argc,char * argv[]){
     char buffer [4096];
     int z=syscall(GET,x,buffer,4096);
     if(z!=-1) printf("blocco:%d\nil messaggio trovato è: %s\n",x,buffer);
-    else printf("indice già non eliminabile\n");
+    else printf("indice non valido\n");
     return 0;
 }

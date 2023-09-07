@@ -17,6 +17,6 @@ int main(int argc,char * argv[]){
     }
     int z=syscall(INVALIDATE,x);
     if(z!=-1)   printf("index: %d\n",z);
-    else    printf("indice già non eliminabile\n");
+    else    printf("indice non valido\n");
     return 0;
 }
