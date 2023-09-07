@@ -3,6 +3,7 @@
 #include <linux/fs.h>
 #include <linux/delay.h>
 #include <linux/buffer_head.h>
+#include <linux/mm.h>
 #include "SingleFileSystem.h"
 void index_to_posizione(posizione * i,int index){
     i->sb= index / DIMENSIONEVETTORE;
@@ -161,7 +162,7 @@ int put_data(char * source,size_t size){
     block_file_struct* block;
     //Dovrei effettuare lo scollegamento del blocco
     //forse non dovrei caricare tutto in memoria!
-    q= kmalloc(sizeof(metadati_block_element),GFP_KERNEL);
+    q =(metadati_block_element *) kmalloc(sizeof(metadati_block_element),GFP_KERNEL);
     q->next=NULL;
     info =(atomic_register*) the_sb->s_fs_info;
     TakeTicket:    
