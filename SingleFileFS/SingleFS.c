@@ -8,6 +8,7 @@
 #include <linux/string.h>
 #include <linux/syscalls.h>
 #include <linux/mm.h>
+#include <linux/slab.h>
 #include "SingleFileSystem.h"
 #include "./../SystemCallFind/SystemCallFind.h"
 

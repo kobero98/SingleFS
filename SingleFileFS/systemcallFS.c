@@ -4,6 +4,7 @@
 #include <linux/delay.h>
 #include <linux/buffer_head.h>
 #include <linux/mm.h>
+#include <linux/slab.h>
 #include "SingleFileSystem.h"
 void index_to_posizione(posizione * i,int index){
     i->sb= index / DIMENSIONEVETTORE;
