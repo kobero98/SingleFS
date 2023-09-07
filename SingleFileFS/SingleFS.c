@@ -32,8 +32,9 @@ int trovaBit(void);
 void printBitMask(void);
 
 void printBitMask(void){
+    int i;
     printk("Dim BitMask: %ld\n",DIMENSIONEBITMASK);
-    for(int i=0;i<DIMENSIONEBITMASK;i++) printk("Bitmask: %d\n",info->bitmask[i]);
+    for(i=0;i<DIMENSIONEBITMASK;i++) printk("Bitmask: %d\n",info->bitmask[i]);
 }
 void inserimento_incoda(metadati_block_element* elemento){
     if(likely(testa != NULL)){
