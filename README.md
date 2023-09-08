@@ -37,5 +37,5 @@ in seguito si può eseguire il comando
 ```
 make create-user
 ```
-per compilare nella cartella user alcuni programmi di esempio che eseguono le systemcall o alcuni test per vedere la corretta funzionalità del sistema<br>
+per compilare nella cartella user alcuni programmi di esempio che eseguono le systemcall o alcuni test per vedere la corretta funzionalità del sistema.<br>
 
