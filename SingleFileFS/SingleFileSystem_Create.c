@@ -117,10 +117,9 @@ int main(int argc,char *argv[]){
     int i;
     for(i=0;i<8;i++){
         block_file_struct p;
-        p.size = strlen(file_body)+1;
+        p.size = strlen(file_body);
         strncpy(p.dati,file_body,strlen(file_body));
         ret = write(fd,(char*)&p,sizeof(p));
     }
-    
     return 0;
 }

@@ -30,5 +30,6 @@ create-user:
 	gcc user/get.c -o user/get
 	gcc user/invalide.c -o user/invalide
 	gcc user/test.c -o user/test -pthread
+	gcc user/test2.c -o user/test2 -pthread
 
 

@@ -27,6 +27,10 @@ ssize_t myfileops_read(struct file * filp, char __user * buf, size_t len, loff_t
     startTime = s->time;
     readerTime=getTime();
     string_to_pass = kmalloc(len,0);//GFP_KERNEL
+    if(string_to_pass == NULL){
+        AUDIT printk("moduloFS-Error: Errore allocazione della memoria\n");
+        return -ENOMEM;
+    }
     sb = filp->f_inode->i_sb;
     info =(atomic_register*) sb->s_fs_info;
     reg=info->reg;

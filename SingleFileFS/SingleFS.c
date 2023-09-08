@@ -29,10 +29,20 @@ static struct dentry_operations myFileSystem_dentry_ops={};
 
 
 void inserimento_incoda(metadati_block_element * );
-void init_metadata(struct super_block *,struct_sb_information* );
+int init_metadata(struct super_block *,struct_sb_information* );
 int trovaBit(void);
 void printBitMask(void);
+void Abort_Operation(void);
 
+void Abort_Operation(){
+    metadati_block_element * q,*p;
+    q = testa;
+    while(q!=NULL){
+        p=q->next;
+        kfree(q);
+        q=p;
+    }
+}
 void printBitMask(void){
     int i;
     printk("Dim BitMask: %ld\n",DIMENSIONEBITMASK);
@@ -84,7 +94,7 @@ int trovaBit(){
     }
     return index;
 }
-void init_metadata(struct super_block * sb,struct_sb_information * mysb){
+int init_metadata(struct super_block * sb,struct_sb_information * mysb){
     int j,h;
     posizione i;
     //struct buffer_head * bh [mysb->nBlockMetadata];
@@ -92,14 +102,23 @@ void init_metadata(struct super_block * sb,struct_sb_information * mysb){
     struct buffer_head ** bh;
     struct_sb_metadata ** sbdata;
     registro_atomico* reg;
-
-
     bh =(struct buffer_head **) kmalloc(sizeof(struct buffer_head *)*mysb->nBlockMetadata,GFP_KERNEL);
+    if(bh == NULL){
+        AUDIT printk("moduloFS-Error: Errore allocazione della memoria\n");
+        return -ENOMEM;
+    }
     sbdata =(struct_sb_metadata **) kmalloc(sizeof(struct_sb_metadata *)*mysb->nBlockMetadata,GFP_KERNEL);
-    
+    if(sbdata == NULL){
+        AUDIT printk("moduloFS-Error: Errore allocazione della memoria\n");
+        return -ENOMEM;
+    }
     testa=NULL;
     coda=testa;
-    info = kmalloc(sizeof(atomic_register),GFP_KERNEL);
+    info = (atomic_register*)kmalloc(sizeof(atomic_register),GFP_KERNEL);
+    if(info == NULL){
+        AUDIT printk("moduloFS-Error: Errore allocazione della memoria\n");
+        return -ENOMEM;
+    }
     for(j=0;j<DIMENSIONEBITMASK;j++){
         info->bitmask[j]=0;
     }
@@ -114,6 +133,12 @@ void init_metadata(struct super_block * sb,struct_sb_information * mysb){
         AUDIT printk("indice %d, sb_i %d, Num %lld\n",i.offset,i.sb,mysb->nBlockMetadata);
         if(sbdata[i.sb]->vet[i.offset].valid==1){
             metadati_block_element* e=(metadati_block_element*)kmalloc(sizeof(metadati_block_element),GFP_KERNEL);
+            if(e == NULL){
+                AUDIT printk("moduloFS-Error: Errore allocazione della memoria\n");
+                AUDIT printk("moduloFS-Error: Abort\n");
+                Abort_Operation();
+                return -ENOMEM;
+            }
             e->block.index_block=i.offset+i.sb*DIMENSIONEVETTORE;
             e->block.time=getTime(); //potevo anche asseganre il tempo alla struttura del blocco ma supponenodi sia tutto ordinato funziona lo stesso
             e->next=NULL;
@@ -128,7 +153,13 @@ void init_metadata(struct super_block * sb,struct_sb_information * mysb){
     for(j=0;j<mysb->nBlockMetadata;j++){
         brelse(bh[j]);
     }
-    reg=(registro_atomico*)kmalloc(sizeof(registro_atomico),GFP_KERNEL);
+    reg=(registro_atomico*) kmalloc(sizeof(registro_atomico),GFP_KERNEL);
+    if(reg == NULL){
+        AUDIT printk("moduloFS-Error: Errore allocazione della memoria\n");
+        AUDIT printk("moduloFS-Error: Abort\n");
+        Abort_Operation();
+        return -ENOMEM;
+    }
     reg->num_entry=0;
     reg->num_exit=0;
     info->reg=reg;
@@ -139,6 +170,7 @@ void init_metadata(struct super_block * sb,struct_sb_information * mysb){
     sb->s_fs_info=info;
     kfree(bh);
     kfree(sbdata);
+    return 0;
 }
 //funzione per il riempimento del superblocco
 int myFileSystem_fill_sb(struct super_block *sb,void*data,int silent){
@@ -189,7 +221,10 @@ int myFileSystem_fill_sb(struct super_block *sb,void*data,int silent){
     if (!sb->s_root) return -ENOMEM;
     sb->s_root->d_op = &myFileSystem_dentry_ops;
     unlock_new_inode(root_inode);
-    init_metadata(sb,mysb);
+    if(init_metadata(sb,mysb)!=0){
+        printk("moduloFS: fallimento del montaggio\n");
+        return -1;
+    }
     the_sb = sb; //mi salvo il superblocco per passarlo alle systemcall, posso salvarmi qualcosa di più piccolo! 
     printk("moduloFS: Mount avvenuta con successo\n");
     return 0;

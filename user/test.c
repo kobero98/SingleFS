@@ -11,17 +11,21 @@
 #define PUT 134
 #define GET 156
 #define INVALIDATE 174
-#define N 400
+#define N 3
 
 void *ThreadRead(void * param){
     int j=0;
     while(j<N){    
         int fd = open("../PointMount/the-file",O_RDONLY);
+        if (fd <0){
+             fd = open("./PointMount/the-file",O_RDONLY);
+        }
+        if (fd<0) return NULL;
         int x;
         do{
             char p[1024];
             x=read(fd,p,1024);
-            printf("Lettore:%d %s \n",x,p);
+            printf("Lettore:fd=%d x=%d %s \n",fd,x,p);
         }while(x>0);
         close(fd);
         j++;
@@ -86,6 +90,6 @@ int main(){
     for(i=0;i<2;i++){
         pthread_join(tidInvalide[i],NULL);
     }
-    pthread_join(tidread,NULL);
+    pthread_join(tidread,NULL); 
     return 0;
 }

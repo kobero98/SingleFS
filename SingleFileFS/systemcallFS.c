@@ -164,6 +164,10 @@ int put_data(char * source,size_t size){
     //Dovrei effettuare lo scollegamento del blocco
     //forse non dovrei caricare tutto in memoria!
     q =(metadati_block_element *) kmalloc(sizeof(metadati_block_element),GFP_KERNEL);
+    if(q == NULL){
+        AUDIT printk("moduloFS-put-Error: Errore allocazione della memoria\n");
+        return -ENOMEM;
+    }
     q->next=NULL;
     info =(atomic_register*) the_sb->s_fs_info;
     TakeTicket:    
@@ -211,10 +215,10 @@ int get_data(int offset,char * destination,size_t size){
     int diff,mask;
     block_file_struct* block;
     if(offset>=NBLOCK){
-        AUDIT printk("modulefs-get: offset maggiore del numero massimo\n");
+        AUDIT printk("moduloFS-get: offset maggiore del numero massimo\n");
     }
     if(!checkBit(offset)){
-        AUDIT printk("modulefs-get: offset non valido\n");
+        AUDIT printk("moduloFS-get: offset non valido\n");
         return -ENODATA;
     }
     bh=sb_bread(the_sb,offset+NUMEROMETADATABLOCK+2);
@@ -247,6 +251,13 @@ int invalidate_data(int offset){
     }
     index_to_posizione(&mypos,offset);
     info =(atomic_register*) the_sb->s_fs_info;
+    
+    newReg =(registro_atomico *) kmalloc(sizeof(registro_atomico),GFP_KERNEL);
+    if(newReg == NULL){
+        AUDIT printk("moduloFS-Error: Errore allocazione della memoria\n");
+        return -ENOMEM;
+    }
+
     TakeTicketInvalid:    
     compare = __sync_bool_compare_and_swap(&(info->lockScrittore),0,1);
     if(compare == false){
@@ -262,7 +273,6 @@ int invalidate_data(int offset){
     mark_buffer_dirty(bh);
     SYNCRONUS sync_dirty_buffer(bh);
     brelse(bh);
-    newReg =(registro_atomico *) kmalloc(sizeof(registro_atomico),GFP_KERNEL);
     newReg->num_entry=0;
     newReg->num_exit=0;
     p=NULL;
