@@ -3,8 +3,8 @@ Progetto per il corso di Sistemi Operativi Avanzati della facoltà di Ingegneria
 ## Autore
 - Matteo Federico 0321569
 ## Scopo
-Il progetto prevede la creazione di un block device driver e l'implementazione delle operazioni di open, read, release.<br>
-Inoltre bisognava implementare tre system call per poter utilizzare il device senza dover utilizzare le A.P.I. del Virtual File System, in particolare, le tre systemcall da implementare sono:
+Il progetto prevede la creazione di un block device driver e l'implementazione delle operazioni di open, read, release. In particolare, l'opearzione di Read deve consegnare in ordine di inserimento i dati a chi la invoca.<br>
+Bisognava implementare tre system call per poter utilizzare il device senza dover utilizzare le A.P.I. del Virtual File System, le tre Systemcall da implementare sono:
 - int put (char * buffer,int size): per inserire un nuovo blocco di dati
 - int get(int index,char *buffer,int size): per ottenere le informazioni di un blocco specificato come parametro
 - int invalide(int offset): per eliminare il blocco indicato come parametro
