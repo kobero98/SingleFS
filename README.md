@@ -16,9 +16,9 @@ Ogni blocco ha dimensione fissata di 4096 Byte, la struttura dei blocchi varia a
 - N blocchi di dati: ogni blocco di dati é strutturato con un campo indicande la dimensione dei dati e il campo dei dati.
 ## Pre-requisiti
 Il modulo per essere compilato ed eseguito necessità di:
-- *gcc*
-- *Make*
-Il sistema é stato provato sulle seguenti versioni del kernel: {6.4.12, 6.4.8, 6.2.0,5.15.0}
+- **gcc**
+- **Make**
+- Il sistema é stato provato sulle seguenti versioni del kernel: {**6.4.12**, **6.4.8**, **6.2.0**, **5.15.0**}
 
 ## Compilazione e Montaggio
 Nella cartela principale del progetto eseguire il comando
